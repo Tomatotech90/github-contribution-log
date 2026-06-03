@@ -3,8 +3,11 @@
 # Contribution [#]: [Issue Title]
 
 **Contribution Number:** 
+
 **Student:** Jonathan Morales
+
 **Issue:** [GitHub issue link]  
+
 **Status:** Phase I
 
 ---
