@@ -12,9 +12,9 @@
 
 ## Why I Chose This Issue
 
-This issue is a focused and well-scoped enhancement inside pwndbg's memory inspection tooling. The `vmmap` command already labels regions like `[heap]` and `[stack]`, but the TLS region is left anonymous even though its address is already known. That gap makes TLS harder to spot during a debugging session, which matters in exploit development and reverse engineering workflows.
+The `vmmap` command already labels regions such as `[heap]` and `[stack]`, but the TLS region remains anonymous even though its address is known. That gap makes TLS harder to spot during a debugging session, which matters in exploit development and reverse engineering workflows.
 
-The fix touches a small, well-defined part of the codebase and requires understanding how pwndbg builds its memory map, how the `tls` command resolves addresses, and how the `Page` object controls what labels are displayed.
+The fix touches a small, well-defined part of the codebase and requires an understanding of how pwndbg builds its memory map, how the `tls` command resolves addresses, and how the `Page` object controls which labels are displayed.
 
 ---
 
@@ -54,7 +54,7 @@ pwndbg> vmmap
 
 ### Environment Setup
 
-Reproduced on Ubuntu 24.04 running inside a VMware virtual machine. pwndbg was cloned from the official repository and installed via `./setup.sh`. A missing C++ compiler caused the setup to fail initially, resolved by running `apt install -y g++ build-essential` before retrying.
+Reproduced on Ubuntu 24.04 running inside a VMware virtual machine. pwndbg was cloned from the official repository and installed via `./setup.sh`. A missing C++ compiler caused the setup to fail initially; it was resolved by running `apt install -y g++ build-essential` before retrying.
 
 ### Steps to Reproduce
 
@@ -115,7 +115,7 @@ The root cause is that `vmmap` builds its page list from `/proc/PID/maps`, which
 
 ### Proposed Solution
 
-After the memory map pages are fetched, call `pwndbg.aglib.tls.find_address_with_register()` to get the TLS base address. Find the page that contains that address and set its `objfile` to `[tls]`. If TLS is not initialized or the address cannot be resolved, skip the labeling silently.
+After the memory map pages have been fetched, call `pwndbg.aglib.tls.find_address_with_register()` to obtain the TLS base address. Find the page that contains that address and set its `objfile` to `[tls]`. If TLS is not initialized or the address cannot be resolved, silently skip labeling.
 
 ### Implementation Plan
 
@@ -134,7 +134,7 @@ Using UMPIRE framework (adapted):
 
 **Implement:** [Link to branch/commits as work progresses]
 
-**Review:** Verify the change follows pwndbg contribution guidelines, does not break existing `vmmap` tests, and handles edge cases including uninitialized TLS, remote targets, and non-x86 architectures.
+**Review:** Verify the change follows pwndbg contribution guidelines, does not break existing `vmmap` tests, and handles edge cases, including uninitialized TLS, remote targets, and non-x86 architectures.
 
 **Evaluate:** Run `vmmap` after interrupting a live process and confirm the TLS region displays as `[tls]`.
 
@@ -155,7 +155,7 @@ Using UMPIRE framework (adapted):
 
 ### Manual Testing
 
-Reproduced the bug on Ubuntu 24.04 with `/usr/bin/sleep 30` as the target. After the process was fully initialized and interrupted, `tls` resolved the address and `vmmap` confirmed the same region is labeled `[anon_...]`. Fix not yet implemented.
+Reproduced the bug on Ubuntu 24.04 with `/usr/bin/sleep 30` as the target. After the process was fully initialized and then interrupted, `tls` resolved the address, and `vmmap` confirmed that the same region is labeled `[anon_...]`. Fix not yet implemented.
 
 ---
 
@@ -189,15 +189,15 @@ Reproduced the issue on a local Ubuntu VM. Read through `tls.py` and `vmmap.py` 
 
 ### Technical Skills Gained
 
-Gained familiarity with how pwndbg builds and labels memory map pages, and how the `tls` command resolves addresses through architecture-specific registers. Better understanding of TLS initialization order relative to the dynamic linker.
+Gained familiarity with how pwndbg builds and labels memory-map pages, and how the `tls` command resolves addresses via architecture-specific registers. Better understanding of TLS initialization order relative to the dynamic linker.
 
 ### Challenges Overcome
 
-TLS is not available at `_start` so early breakpoints returned nothing. The correct approach was letting the program fully initialize via `continue` and then interrupting it with `Ctrl+C`. Initial attempts with `break main` failed because the binary had no debug symbols.
+TLS is not available at `_start` so early breakpoints returned nothing. The correct approach was to let the program fully initialize via `continue`, then interrupt it with `Ctrl+C`. Initial attempts using `break main` failed because the binary lacked debug symbols.
 
 ### What I Would Do Differently Next Time
 
-Read the relevant source files before starting reproduction. Understanding `objfile` and how page labels work earlier would have made the fix direction clear from the start.
+Read the relevant source files before starting reproduction. Understanding `objfile` and how page labels work earlier would have made the direction of the fix clear from the start.
 
 ---
 
