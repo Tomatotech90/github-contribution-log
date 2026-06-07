@@ -156,14 +156,14 @@ Using UMPIRE framework (adapted):
 
 **Before - TLS region labeled as anonymous:**
 
-![vmmap before showing anon label](vmmap_before.png)
+![vmmap before showing anon label](vmmap_before.jpg)
 ```
 vmmap
 ```
 
 **After - TLS region correctly labeled:**
 
-![vmmap after showing tls label](vmmap_after.png)
+![vmmap after showing tls label](vmmap_after.jpg)
 ```
 vmmap
 ```
