@@ -12,11 +12,11 @@
 
 ## Why This Issue
 
-pwndbg is a plugin for GDB, a debugger used to pause and inspect a running program's memory. pwndbg extends GDB with commands like `vmmap` and `tls` that present memory information in a readable and structured format, which is particularly useful during exploit development and reverse engineering.
+pwndbg is a plugin for GDB, a debugger that lets you pause and inspect a running program's memory. pwndbg extends GDB with commands such as `vmmap` and `tls` that present memory information in a readable, structured format, which is particularly useful during exploit development and reverse engineering.
 
-When a program runs, the operating system divides its memory into regions. Some regions have meaningful labels like `[heap]` where dynamic memory is allocated, and `[stack]` where function call data lives. Thread Local Storage (TLS) is another region where each thread stores private variables such as the stack canary and thread pointer.
+When a program runs, the operating system divides its memory into regions. Some regions have meaningful labels, such as `[heap]` for dynamic memory allocation and `[stack]` for function-call data. Thread Local Storage (TLS) is another region where each thread stores private variables, such as the stack canary and thread pointer.
 
-The `vmmap` command displays all memory regions. The TLS region appeared as `[anon_7ffff7fa7]` because the kernel reports it as an anonymous mapping with no name. pwndbg already resolves the TLS address through the `tls` command using the `fsbase` register on x86-64, but that address was never used to label the corresponding region in `vmmap` output. The change is contained to a small, well-defined part of the codebase and requires understanding how pwndbg builds its memory map, how the `tls` command resolves addresses, and how the `Page` object controls what labels are displayed.
+The `vmmap` command displays all memory regions. The TLS region appeared as `[anon_7ffff7fa7]` because the kernel reports it as an anonymous mapping with no name. pwndbg already resolves the TLS address through the `tls` command using the `fsbase` register on x86-64, but that address was never used to label the corresponding region in `vmmap` output. The change is limited to a small, well-defined part of the codebase and requires understanding of how pwndbg builds its memory map, how the `tls` command resolves addresses, and how the `Page` object controls which labels are displayed.
 
 ---
 
@@ -24,7 +24,7 @@ The `vmmap` command displays all memory regions. The TLS region appeared as `[an
 
 ### Problem Description
 
-The `tls` command resolves the Thread Local Storage base address using architecture-specific registers (`fsbase` on x86-64). The `vmmap` command has no awareness of this and displays the same memory region with a generic anonymous label instead of `[tls]`.
+The `tls` command resolves the Thread Local Storage base address using architecture-specific registers (`fsbase` on x86-64). The `vmmap` command is unaware of this and displays the same memory region with a generic anonymous label instead of `[tls]`.
 
 ### Expected Behavior
 
@@ -58,6 +58,10 @@ pwndbg> vmmap
 
 Reproduced on Ubuntu 24.04 running inside a VMware virtual machine. pwndbg was cloned from the official repository and installed via `./setup.sh`. A missing C++ compiler caused the setup to fail initially, resolved by running `apt install -y g++ build-essential` before retrying.
 
+### Approach
+
+`/usr/bin/sleep` was chosen as the target binary because it stays alive long enough to inspect memory. Binaries without debug symbols cannot use `break main`, so `starti` was used instead to stop at the very first instruction. From there, execution needed to advance far enough for TLS to be fully initialized before `tls` and `vmmap` could be run. A catchpoint on libc load allowed controlled progression through the dynamic linker initialization. Once past that point, `continue` followed by `Ctrl+C` paused the process mid-execution while it was sleeping, at which point TLS was fully initialized and available for inspection.
+
 ### Steps to Reproduce
 
 1. Launch GDB targeting `/usr/bin/sleep`:
@@ -65,18 +69,18 @@ Reproduced on Ubuntu 24.04 running inside a VMware virtual machine. pwndbg was c
    gdb /usr/bin/sleep
    ```
 
-2. Stop at the very first instruction using `starti`. At this point TLS does not exist yet because the dynamic linker has not run:
+2. Stop at the very first instruction. TLS does not exist yet at this point because the dynamic linker has not run:
    ```
    starti 30
    ```
 
-3. Set a catchpoint on libc. This pauses execution the moment the dynamic linker loads libc, giving a controlled stopping point before the program reaches its entry point:
+3. Set a catchpoint on libc load to pause execution once the dynamic linker has progressed far enough:
    ```
    catch load libc
    continue
    ```
 
-4. Continue past the catchpoint and interrupt the process with `Ctrl+C` once it is sleeping. At this point TLS is fully initialized:
+4. Continue past the catchpoint. Once the process is sleeping, interrupt it with `Ctrl+C`. TLS is fully initialized at this point:
    ```
    continue
    ^C
@@ -122,9 +126,9 @@ The root cause is that `vmmap` builds its page list from `/proc/PID/maps`, which
 
 ### Approach
 
-`find_address_with_register()` reads the `fsbase` register directly to get the TLS base address. This was chosen over `find_address_with_pthread_self()` because calling `pthread_self()` inside the target process has side effects, a concern raised in the original issue thread. Register reads have no impact on the target process.
+`find_address_with_register()` reads the `fsbase` register directly to get the TLS base address. This was chosen over `find_address_with_pthread_self()` because calling `pthread_self()` in the target process has side effects, as noted in the original issue thread. Register reads have no impact on the target process.
 
-Once the address is resolved, `lookup_page()` finds the matching `Page` object in the memory map and its `objfile` field is set to `[tls]`, the same mechanism used to label `[heap]` and `[stack]`.
+Once the address is resolved, `lookup_page()` finds the matching `Page` object in the memory map, and sets its `objfile` field to `[tls]`, the same mechanism used to label `[heap]` and `[stack]`.
 
 A separate helper function `_label_tls_region()` was created and called from both `get_memory_map()` and `_stop_cached_memory_map()` because `vmmap.py` has two code paths for fetching the memory map: the default path on Linux/GDB and the persistent cache path on macOS/LLDB. Both paths needed the same labeling logic.
 
@@ -144,7 +148,7 @@ Using UMPIRE framework (adapted):
 
 **Implement:** [Link to branch/commits as work progresses]
 
-**Review:** Verify the change follows pwndbg contribution guidelines, does not break existing `vmmap` tests, and handles edge cases including uninitialized TLS, remote targets, and non-x86 architectures.
+**Review:** Verify the change follows pwndbg contribution guidelines, does not break existing `vmmap` tests, and handles edge cases, including uninitialized TLS, remote targets, and non-x86 architectures.
 
 **Evaluate:** Run `vmmap` after interrupting a live process and confirm the TLS region displays as `[tls]`.
 
@@ -181,7 +185,7 @@ vmmap
 
 ### Manual Testing
 
-Reproduced the bug on Ubuntu 24.04 with `/usr/bin/sleep 30` as the target. After the process was fully initialized and interrupted, `tls` resolved the address and `vmmap` confirmed the same region was labeled `[anon_...]`. After applying the change to `vmmap.py`, the same region correctly displayed as `[tls]`.
+Reproduced the bug on Ubuntu 24.04 with `/usr/bin/sleep 30` as the target. After the process was fully initialized and then interrupted, `tls` resolved the address, and `vmmap` confirmed that the same region was labeled `[anon_...]`. After applying the change to `vmmap.py`, the same region correctly displayed as `[tls]`.
 
 ---
 
@@ -189,7 +193,7 @@ Reproduced the bug on Ubuntu 24.04 with `/usr/bin/sleep 30` as the target. After
 
 ### Week 1 Progress
 
-Reproduced the issue on Ubuntu 24.04 inside a VMware virtual machine. Read through `tls.py`, `vmmap.py`, `memory.py`, and `dbg_mod/__init__.py` to understand how pages are fetched, cached, and labeled. Confirmed `Page.objfile` is mutable and that `lookup_page()` returns the actual object rather than a copy, making in-place modification safe. Setup required installing a missing C++ compiler before `./setup.sh` could complete.
+Reproduced the issue on Ubuntu 24.04 inside a VMware virtual machine. Read through `tls.py`, `vmmap.py`, `memory.py`, and `dbg_mod/__init__.py` to understand how pages are fetched, cached, and labeled. Confirmed `Page.objfile` is mutable and that `lookup_page()` returns the actual object rather than a copy, making in-place modification safe. Set up required installing a missing C++ compiler before `./setup.sh` could complete.
 
 ### Code Changes
 
@@ -219,7 +223,7 @@ Gained hands-on familiarity with how pwndbg builds and labels memory map pages, 
 
 ### Challenges Overcome
 
-TLS is not available at `_start` because the dynamic linker has not run yet, so early breakpoints returned nothing from the `tls` command. The correct approach was catching libc load, continuing past it, and then interrupting the process with `Ctrl+C` once it was fully running. Initial attempts with `break main` failed because the binary had no debug symbols.
+TLS is not available at `_start` because the dynamic linker has not run yet, so early breakpoints returned nothing from the `tls` command. The correct approach was to catch the libc load, continue past it, and then interrupt the process with `Ctrl+C` once it was fully running. Initial attempts with `break main` failed because the binary had no debug symbols.
 
 ### What Would Be Done Differently Next Time
 
