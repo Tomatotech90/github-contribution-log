@@ -130,14 +130,14 @@ def _refine_memory_map(pages: MemoryMap) -> MemoryMap:
 
 
 # -----------------------------------------------------------------------
-#  issue #1570
+# issue #1570
 # -----------------------------------------------------------------------
 #
 # New function: _label_tls_region()
 # Before this change, the TLS region showed up as [anon_...] in vmmap
-# because the kernel does not name it. The tls command already knew the
-# address via fsbase/gsbase/TPIDR_EL0 registers but vmmap had no way to
-# use that information. This function bridges that gap.
+# because the kernel does not name it. The TLS command already knew the
+# address via fsbase/gsbase/TPIDR_EL0 registers, but vmmap had no way to
+# use that information. 
 #
 # Kept as a separate function because get_memory_map() has two code paths
 # (Linux/GDB and macOS/LLDB persistent cache) and both need the same logic.
@@ -146,26 +146,22 @@ def _refine_memory_map(pages: MemoryMap) -> MemoryMap:
 
 def _label_tls_region(memory_map: MemoryMap) -> None:
 
-    # Get TLS base address from the CPU register directly.
-    # Using find_address_with_register() instead of find_address_with_pthread_self()
-    # because calling pthread_self() inside the target process can have side effects.
-    # See issue #1570 discussion. Register reads are safe and non-intrusive.
+    # Read TLS base address from the CPU register.
+    # find_address_with_register() is used instead of find_address_with_pthread_self()
+    # because pthread_self() runs code inside the target process, which can alter its state.
     tls_address = pwndbg.aglib.tls.find_address_with_register()
 
-    # If TLS is not initialized yet or the arch is not supported, returns 0.
-    # Nothing to label in that case so just return.
+    # Returns 0 if TLS is not initialized or the architecture is not supported.
     if not tls_address:
         return
 
-    # Find the page that contains the TLS address and label it.
-    # lookup_page() returns the actual Page object so setting objfile here
-    # modifies it in place inside the cached memory map.
+    # Find the page containing the TLS address and set its label.
     tls_page = memory_map.lookup_page(tls_address)
     if tls_page is not None:
         tls_page.objfile = "[tls]"
 
 # -----------------------------------------------------------------------
-#  end issue #1570
+# end issue #1570
 # -----------------------------------------------------------------------
 
 
