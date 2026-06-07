@@ -128,7 +128,7 @@ The root cause is that `vmmap` builds its page list from `/proc/PID/maps`, which
 
 `find_address_with_register()` reads the `fsbase` register directly to get the TLS base address. This was chosen over `find_address_with_pthread_self()` because calling `pthread_self()` in the target process has side effects, as noted in the original issue thread. Register reads have no impact on the target process.
 
-Once the address is resolved, `lookup_page()` finds the matching `Page` object in the memory map, and sets its `objfile` field to `[tls]`, using the same mechanism used to label `[heap]` and `[stack]`.
+Once the address is resolved, `lookup_page()` finds the matching `Page` object in the memory map and sets its `objfile` field to `[tls]`, using the same mechanism that labels `[heap]` and `[stack]`.
 
 A separate helper function `_label_tls_region()` was created and called from both `get_memory_map()` and `_stop_cached_memory_map()` because `vmmap.py` has two code paths for fetching the memory map: the default path on Linux/GDB and the persistent cache path on macOS/LLDB. Both paths needed the same labeling logic.
 
@@ -198,16 +198,16 @@ Reproduced the issue on Ubuntu 24.04 inside a VMware virtual machine. Read throu
 ### Code Changes
 
 - **Files modified:** `pwndbg/aglib/vmmap.py`
-- **Key commits:** [To be added]
-- **Approach decisions:** Register-based TLS resolution via `find_address_with_register()` was chosen to avoid calling `pthread_self()` implicitly, which was flagged as a concern in the issue thread. A dedicated helper function `_label_tls_region()` was introduced rather than inlining the logic to avoid duplication across both memory map code paths.
+- **Key commits:** [Pending]
+- **Approach decisions:** Register-based TLS resolution via `find_address_with_register()` was chosen to avoid calling `pthread_self()` implicitly, which was flagged as a concern in the issue thread. A dedicated helper function `_label_tls_region()` was introduced instead of inlining the logic to avoid duplication across the two memory map code paths.
 
 ---
 
 ## Pull Request
 
-**PR Link:** [To be submitted]
+**PR Link:** [Pending]
 
-**PR Description:** [To be drafted]
+**PR Description:** [Pending]
 
 **Maintainer Feedback:** [Pending]
 
