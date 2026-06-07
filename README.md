@@ -16,7 +16,7 @@ pwndbg is a plugin for GDB, a debugger that lets you pause and inspect a running
 
 When a program runs, the operating system divides its memory into regions. Some regions have meaningful labels, such as `[heap]` for dynamic memory allocation and `[stack]` for function-call data. Thread Local Storage (TLS) is another region where each thread stores private variables, such as the stack canary and thread pointer.
 
-The `vmmap` command displays all memory regions. The TLS region appeared as `[anon_7ffff7fa7]` because the kernel reports it as an anonymous mapping with no name. pwndbg already resolves the TLS address through the `tls` command using the `fsbase` register on x86-64, but that address was never used to label the corresponding region in `vmmap` output. The change is limited to a small, well-defined part of the codebase and requires understanding of how pwndbg builds its memory map, how the `tls` command resolves addresses, and how the `Page` object controls which labels are displayed.
+The `vmmap` command displays all memory regions. The TLS region appeared as `[anon_7ffff7fa7]` because the kernel reports it as an anonymous mapping with no name. pwndbg already resolves the TLS address through the `tls` command using the `fsbase` register on x86-64, but that address was never used to label the corresponding region in `vmmap` output. The only file that needed to be changed was `pwndbg/aglib/vmmap.py`.
 
 ---
 
