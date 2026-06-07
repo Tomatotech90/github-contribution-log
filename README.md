@@ -48,7 +48,7 @@ pwndbg> vmmap
 
 - `pwndbg/commands/tls.py` - user-facing command that displays TLS information by calling `pwndbg.aglib.tls.find_address_with_register()`
 - `pwndbg/aglib/vmmap.py` - fetches, caches, and returns memory map pages
-- `pwndbg/lib/memory.py` - defines the `Page` object and its `objfile` field which controls region labels
+- `pwndbg/lib/memory.py` - defines the `Page` object and its `objfile` field, which controls region labels
 
 ---
 
@@ -56,11 +56,11 @@ pwndbg> vmmap
 
 ### Environment Setup
 
-Reproduced on Ubuntu 24.04 running inside a VMware virtual machine. pwndbg was cloned from the official repository and installed via `./setup.sh`. A missing C++ compiler caused the setup to fail initially, resolved by running `apt install -y g++ build-essential` before retrying.
+Reproduced on Ubuntu 24.04 running inside a VMware virtual machine. pwndbg was cloned from the official repository and installed via `./setup.sh`. A missing C++ compiler caused the setup to fail initially; it was resolved by running `apt install -y g++ build-essential` before retrying.
 
 ### Approach
 
-`/usr/bin/sleep` was chosen as the target binary because it stays alive long enough to inspect memory. Binaries without debug symbols cannot use `break main`, so `starti` was used instead to stop at the very first instruction. From there, execution needed to advance far enough for TLS to be fully initialized before `tls` and `vmmap` could be run. A catchpoint on libc load allowed controlled progression through the dynamic linker initialization. Once past that point, `continue` followed by `Ctrl+C` paused the process mid-execution while it was sleeping, at which point TLS was fully initialized and available for inspection.
+`/usr/bin/sleep` was chosen as the target binary because it remains running long enough to inspect its memory. Binaries without debug symbols cannot use `break main`, so `starti` was used instead to stop at the very first instruction. From there, execution needed to advance far enough for TLS to be fully initialized before `tls` and `vmmap` could be run. A catchpoint on libc load allowed controlled progression through the dynamic linker initialization. Once past that point, `continue` followed by `Ctrl+C` paused the process mid-execution while it was sleeping, at which point TLS was fully initialized and available for inspection.
 
 ### Steps to Reproduce
 
@@ -128,7 +128,7 @@ The root cause is that `vmmap` builds its page list from `/proc/PID/maps`, which
 
 `find_address_with_register()` reads the `fsbase` register directly to get the TLS base address. This was chosen over `find_address_with_pthread_self()` because calling `pthread_self()` in the target process has side effects, as noted in the original issue thread. Register reads have no impact on the target process.
 
-Once the address is resolved, `lookup_page()` finds the matching `Page` object in the memory map, and sets its `objfile` field to `[tls]`, the same mechanism used to label `[heap]` and `[stack]`.
+Once the address is resolved, `lookup_page()` finds the matching `Page` object in the memory map, and sets its `objfile` field to `[tls]`, using the same mechanism used to label `[heap]` and `[stack]`.
 
 A separate helper function `_label_tls_region()` was created and called from both `get_memory_map()` and `_stop_cached_memory_map()` because `vmmap.py` has two code paths for fetching the memory map: the default path on Linux/GDB and the persistent cache path on macOS/LLDB. Both paths needed the same labeling logic.
 
@@ -219,15 +219,15 @@ Reproduced the issue on Ubuntu 24.04 inside a VMware virtual machine. Read throu
 
 ### Technical Skills Gained
 
-Gained hands-on familiarity with how pwndbg builds and labels memory map pages, and how the `tls` command resolves addresses through architecture-specific registers. Deepened understanding of TLS initialization order relative to the dynamic linker and why TLS is unavailable at `_start`.
+Gained hands-on familiarity with how pwndbg builds and labels memory map pages, and how the `tls` command resolves addresses via architecture-specific registers. Deepened understanding of TLS initialization order relative to the dynamic linker and why TLS is unavailable at `_start`.
 
 ### Challenges Overcome
 
-TLS is not available at `_start` because the dynamic linker has not run yet, so early breakpoints returned nothing from the `tls` command. The correct approach was to catch the libc load, continue past it, and then interrupt the process with `Ctrl+C` once it was fully running. Initial attempts with `break main` failed because the binary had no debug symbols.
+TLS is not available at `_start` because the dynamic linker has not run yet, so early breakpoints returned nothing from the `tls` command. The correct approach was to catch the libc load, continue past it, and then interrupt the process with `Ctrl+C` once it was fully running. Initial attempts using `break main` failed because the binary lacked debug symbols.
 
 ### What Would Be Done Differently Next Time
 
-Reading the relevant source files before starting reproduction would clarify the fix direction earlier. Understanding `objfile` and how page labels work from the start would have shortened the analysis phase significantly.
+Reading the relevant source files before starting reproduction would clarify the direction of the fix earlier. Understanding `objfile` and how page labels work from the start would have significantly shortened the analysis phase.
 
 ---
 
