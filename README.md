@@ -6,7 +6,7 @@
 
 **Issue:** [https://github.com/pwndbg/pwndbg/issues/1570](https://github.com/pwndbg/pwndbg/issues/1570)
 
-**Status:** Phase I
+**Status:** Phase 2
 
 ---
 
@@ -205,11 +205,12 @@ Reproduced the issue on Ubuntu 24.04 inside a VMware virtual machine. Read throu
 
 ## Pull Request
 
-**PR Link:** [Pending]
+**PR Link:** https://github.com/pwndbg/pwndbg/pull/3969
 
-**PR Description:** [Pending]
+**PR Description:** Label TLS region in vmmap as [tls]#3969
 
-**Maintainer Feedback:** [Pending]
+
+**Maintainer Feedback:**  still on test (lint issue)
 
 **Status:** In progress
 
