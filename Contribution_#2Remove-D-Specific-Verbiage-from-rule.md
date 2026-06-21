@@ -6,7 +6,7 @@
 
 **Issue:** [https://github.com/ComplianceAsCode/content/issues/8709](https://github.com/ComplianceAsCode/content/issues/8709)
 
-**Status:** Phase I, In Progress
+**Status:** Phase III, In Progress(waitng for the developer answer)
 
 ---
 
@@ -162,6 +162,14 @@ PYEOF
 sed -i '30s/[ \t]*$//' linux_os/guide/auditing/auditd_configure_rules/audit_execution_selinux_commands/audit_rules_execution_semanage/rule.yml
 ```
 
+**Fix application screenshot** — `sed` (Step 1) and the Python script (Step 2), with the "Updated ..." confirmation lines:
+
+![sed and python edit commands with Updated confirmations](dod_3.JPG)
+
+**Fix application screenshot** — the trailing-whitespace `sed` (Step 3), followed by a lint re-check:
+
+![trailing-whitespace sed command and lint re-check](dod_1.JPG)
+
 ### Verification Order (must be run in this sequence, after the fix block above)
 
 The fix must be applied **before** any of the checks below are meaningful. A lint or build pass run against files that still contain the original DoD wording does not verify this fix; it only verifies the file is syntactically valid, which was already true before any edit.
@@ -170,7 +178,7 @@ The fix must be applied **before** any of the checks below are meaningful. A lin
 2. Run the project's CI-equivalent lint check (see Testing Strategy)
 3. Run the full product build (see Testing Strategy)
 
-Each of the three checkboxes in Testing Strategy should be marked complete only after step 1 above confirms the wording fix is present in the working tree.
+Each of the three checkboxes in Testing Strategy should be marked complete only after it has been run, **after** step 1 above confirms the wording fix is present in the working tree.
 
 ### Pre-Existing Lint Issue Discovered (Not Caused by This PR)
 
@@ -229,9 +237,9 @@ No new Automatus test scenarios are required, since this PR makes no changes to 
 
 ### Integration Tests
 
-**Verification Status Note:** An earlier lint and build pass was recorded for this repo, but a subsequent re-clone (to reconfirm the original bug state) reset all file edits, including the trio's wording fix. The lint/build passes that were recorded did not actually prove the wording fix, since neither checks prose content — they only validate YAML syntax and build mechanics, which pass regardless of whether the DoD wording is present. All three boxes below are reset to unchecked until reconfirmed against the actual edited content in one pass.
+**Verification Status Note:** An earlier lint and build pass was recorded for this repo, but a subsequent re-clone (to reconfirm the original bug state) reset all file edits, including the trio's wording fix. The lint/build passes that were recorded did not actually prove the wording fix, since neither checks prose content — they only validate YAML syntax and build mechanics, which pass regardless of whether the DoD wording is present. All three boxes below are reset to unchecked until confirmed against the actual edited content in one pass.
 
-- [ ] No DoD references remain in the five modified files
+- [x] No DoD references remain in the five modified files
   ```bash
   grep -n "DoD" \
     ./linux_os/guide/auditing/auditd_configure_rules/audit_execution_selinux_commands/audit_rules_execution_semanage/rule.yml \
@@ -241,9 +249,9 @@ No new Automatus test scenarios are required, since this PR makes no changes to 
     ./linux_os/guide/system/software/integrity/endpoint_security_software/install_hids/rule.yml
   ```
   (expected: no output, confirming all DoD references were removed)
-  ![after fix grep confirmation](fix_dod.JPG)
+  ![after fix grep confirmation](dod_4.JPG)
 
-- [ ] Project's CI-equivalent lint check passes on all five modified files
+- [x] Project's CI-equivalent lint check passes on all five modified files
   ```bash
   for file in \
     linux_os/guide/auditing/auditd_configure_rules/audit_execution_selinux_commands/audit_rules_execution_semanage/rule.yml \
@@ -261,13 +269,13 @@ No new Automatus test scenarios are required, since this PR makes no changes to 
   done
   ```
   Note: plain `yamllint -c .yamllint <file>` alone is **not** sufficient for the audit trio, since they contain top-level Jinja macros that plain YAML misparses as a syntax error. The command above replicates the project's actual `ci_lint.yml` logic, which strips Jinja constructs before linting.
-  ![yamllint output](yamllint_dod.JPG)
+  ![yamllint output](dod_5.JPG)
 
-- [ ] `./build_product rhel9 --datastream` completes without errors
+- [x] `./build_product rhel9 --datastream` completes without errors
   ```bash
   ./build_product rhel9 --datastream
   ```
-  ![build output](build_dod.JPG)
+  ![build output](dod_2.JPG)
 
 **Run order:** the grep check (DoD removed) must pass before the lint/build checks are meaningful, since lint and build do not validate wording content.
 
@@ -300,7 +308,7 @@ Cloned the repository and located all six candidate files referenced in the main
 **Maintainer Feedback:**
 - [Pending]
 
-**Status:** Not yet opened. Scoping comment drafted (not yet confirmed and posted to the live issue); edits drafted; local lint/build verification pending.
+**Status:** Not yet opened. Scoping comment drafted (not yet confirmed, posted to the live issue), edits drafted, local lint/build verification pending.
 
 ---
 
@@ -314,7 +322,7 @@ Learned to distinguish between DoD wording that's incidental to a generic securi
 
 The original issue's grep output only showed a couple of lines of context per match, which wasn't enough to safely edit any of the files without first reading them in full. Some DoD mentions turned out to be load-bearing (banner text matched by a check, a McAfee-mandate rule) rather than incidental, and that distinction wasn't visible from the grep snippet alone.
 
-Running plain `yamllint` on the three audit rule files produced a syntax error that initially appeared to be caused by the edit. Tracing it back to the original, unedited file confirmed it was pre-existing, caused by a top-level Jinja macro that plain YAML cannot parse on its own. Checking the project's own `ci_lint.yml` workflow confirmed this is expected and already handled in CI via `utils/strip_jinja_for_yamllint.py`, which strips Jinja constructs before linting. This was a useful reminder to verify against the project's actual CI logic rather than assuming a generic tool's output applies directly.
+Running plain `yamllint` against the three audit rule files produced a syntax error that initially appeared to be caused by the edit. Tracing it back to the original, unedited file confirmed it was pre-existing, caused by a top-level Jinja macro that plain YAML cannot parse on its own. Checking the project's own `ci_lint.yml` workflow confirmed this is expected and already handled in CI via `utils/strip_jinja_for_yamllint.py`, which strips Jinja constructs before linting. This was a useful reminder to verify against the project's actual CI logic rather than assuming a generic tool's output applies directly.
 
 ### What I'd Do Differently Next Time
 
