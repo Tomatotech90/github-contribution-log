@@ -95,23 +95,110 @@ Reword each occurrence to describe the underlying security requirement without D
 
 ### Fix Approach (How It Was Solved)
 
-Each file was opened directly in a text editor, and the targeted sentence or paragraph was replaced by hand, rather than using a scripted find-and-replace, since the surrounding YAML block structure (indentation, literal block scalars) needed to stay intact:
+Edits were applied in three steps, in this order:
+
+**Step 1: the three audit rule files (identical single-line change in each), via `sed`:**
 
 ```bash
-nano ./linux_os/guide/auditing/auditd_configure_rules/audit_execution_selinux_commands/audit_rules_execution_semanage/rule.yml
-nano ./linux_os/guide/auditing/auditd_configure_rules/audit_execution_selinux_commands/audit_rules_execution_setfiles/rule.yml
-nano ./linux_os/guide/auditing/auditd_configure_rules/audit_execution_selinux_commands/audit_rules_execution_setsebool/rule.yml
-nano ./linux_os/guide/services/http/securing_httpd/httpd_configure_os_protect_web_server/httpd_antivirus_scan_uploads/rule.yml
-nano ./linux_os/guide/system/software/integrity/endpoint_security_software/install_hids/rule.yml
+sed -i 's/DoD has defined the list of events for which the operating system will provide an audit record generation capability as the following:/The list of events for which the operating system must provide an audit record generation capability includes the following:/' \
+  ./linux_os/guide/auditing/auditd_configure_rules/audit_execution_selinux_commands/audit_rules_execution_semanage/rule.yml \
+  ./linux_os/guide/auditing/auditd_configure_rules/audit_execution_selinux_commands/audit_rules_execution_setfiles/rule.yml \
+  ./linux_os/guide/auditing/auditd_configure_rules/audit_execution_selinux_commands/audit_rules_execution_setsebool/rule.yml
 ```
 
-After each edit, the change was verified with:
+**Step 2: the two multi-line/multi-sentence files, via a Python exact-match replace** (chosen over `sed` because the original text spans multiple lines with parentheses, which `sed` cannot match cleanly):
 
 ```bash
-git diff <path/to/rule.yml>
+python3 << 'PYEOF'
+import pathlib
+
+edits = [
+    {
+        "path": "linux_os/guide/services/http/securing_httpd/httpd_configure_os_protect_web_server/httpd_antivirus_scan_uploads/rule.yml",
+        "old": """    Remote web authors should not be able to upload files to the Document Root
+    directory structure without virus checking and checking for malicious or mobile
+    code. A remote web user, whose agency has a Memorandum of Agreement (MOA) with
+    the hosting agency and has submitted a DoD form 2875 (System Authorization
+    Access Request (SAAR)) or an equivalent document, will be allowed to post files
+    to a temporary location on the server. All posted files to this temporary
+    location will be scanned for viruses and content checked for malicious or mobile
+    code. Only files free of viruses and malicious or mobile code will be posted to
+    the appropriate DocumentRoot directory.""",
+        "new": """    Remote web authors should not be able to upload files to the Document Root
+    directory structure without virus checking and checking for malicious or mobile
+    code. A remote web user, whose agency has a Memorandum of Agreement (MOA) with
+    the hosting agency and has submitted a System Authorization Access Request
+    (SAAR) or an equivalent document, will be allowed to post files to a temporary
+    location on the server. All posted files to this temporary location will be
+    scanned for viruses and content checked for malicious or mobile code. Only
+    files free of viruses and malicious or mobile code will be posted to the
+    appropriate DocumentRoot directory.""",
+    },
+    {
+        "path": "linux_os/guide/system/software/integrity/endpoint_security_software/install_hids/rule.yml",
+        "old": """        In DoD environments, supplemental intrusion detection and antivirus tools,
+        such as the McAfee Host-based Security System, are available to integrate with
+        existing infrastructure. Per DISA guidance, when these supplemental tools interfere
+        with proper functioning of SELinux, SELinux takes precedence. Should further
+        clarification be required, DISA contact information is published publicly at
+        https://www.cyber.mil/stigs/""",
+        "new": """        In some environments, supplemental intrusion detection and antivirus tools
+        are deployed to integrate with existing infrastructure. When these
+        supplemental tools interfere with proper functioning of SELinux, SELinux
+        should take precedence. Consult your organization's security guidance for
+        further clarification.""",
+    },
+]
+
+for edit in edits:
+    p = pathlib.Path(edit["path"])
+    text = p.read_text()
+    if edit["old"] not in text:
+        print(f"NOT FOUND in {edit['path']} -- no changes made")
+        continue
+    p.write_text(text.replace(edit["old"], edit["new"]))
+    print(f"Updated {edit['path']}")
+PYEOF
 ```
 
-to confirm only the intended sentence changed and no whitespace or indentation was disturbed.
+**Step 3: an incidental trailing-whitespace cleanup**, found while lint-checking `audit_rules_execution_semanage/rule.yml` (see "Pre-Existing Lint Issue" below). Since this PR already modifies that file, the one-character fix was made in the same PR rather than left for a separate one:
+
+```bash
+sed -i '30s/[ \t]*$//' linux_os/guide/auditing/auditd_configure_rules/audit_execution_selinux_commands/audit_rules_execution_semanage/rule.yml
+```
+
+After each step, the change was verified with:
+
+```bash
+git diff
+```
+
+to confirm only the intended lines changed and no whitespace or indentation was disturbed elsewhere.
+
+### Pre-Existing Lint Issue Discovered (Not Caused by This PR)
+
+Running plain `yamllint` against the three audit rule files initially produced a `syntax error: could not find expected ':'`. Investigation traced this to a top-level Jinja macro call (`{{{ ocil_fix_srg_privileged_command(...) }}}`) that plain YAML misreads as the start of a flow-mapping. This was confirmed to be **pre-existing and unrelated to this PR** by parsing the original, unedited file directly: the same error occurs at the same line before any DoD-wording edit is applied.
+
+The project's own CI (`.github/workflows/ci_lint.yml`) already accounts for this: any file containing Jinja constructs is piped through `utils/strip_jinja_for_yamllint.py` before linting, rather than linted directly. Reproducing that exact CI logic locally:
+
+```bash
+for file in \
+  linux_os/guide/auditing/auditd_configure_rules/audit_execution_selinux_commands/audit_rules_execution_semanage/rule.yml \
+  linux_os/guide/auditing/auditd_configure_rules/audit_execution_selinux_commands/audit_rules_execution_setfiles/rule.yml \
+  linux_os/guide/auditing/auditd_configure_rules/audit_execution_selinux_commands/audit_rules_execution_setsebool/rule.yml \
+  linux_os/guide/services/http/securing_httpd/httpd_configure_os_protect_web_server/httpd_antivirus_scan_uploads/rule.yml \
+  linux_os/guide/system/software/integrity/endpoint_security_software/install_hids/rule.yml
+do
+  echo "=== $file ==="
+  if grep -qP '\{\{[%{#]' "$file"; then
+    python3 utils/strip_jinja_for_yamllint.py "$file" | yamllint -c .yamllint -
+  else
+    yamllint -c .yamllint "$file"
+  fi
+done
+```
+
+confirmed all five files lint clean under the project's actual CI logic, aside from the one trailing-whitespace error fixed in Step 3 above and one pre-existing `empty-lines` warning in `install_hids/rule.yml` (warning only, does not fail CI, left untouched as out of scope).
 
 ### Implementation Plan
 
@@ -145,15 +232,24 @@ No new Automatus test scenarios are required, since this PR makes no changes to 
 
 ### Integration Tests
 
-- [ ] `yamllint` passes on all five modified files
+- [ ] Project's CI-equivalent lint check passes on all five modified files
   ```bash
-  yamllint -c .yamllint \
-    ./linux_os/guide/auditing/auditd_configure_rules/audit_execution_selinux_commands/audit_rules_execution_semanage/rule.yml \
-    ./linux_os/guide/auditing/auditd_configure_rules/audit_execution_selinux_commands/audit_rules_execution_setfiles/rule.yml \
-    ./linux_os/guide/auditing/auditd_configure_rules/audit_execution_selinux_commands/audit_rules_execution_setsebool/rule.yml \
-    ./linux_os/guide/services/http/securing_httpd/httpd_configure_os_protect_web_server/httpd_antivirus_scan_uploads/rule.yml \
-    ./linux_os/guide/system/software/integrity/endpoint_security_software/install_hids/rule.yml
+  for file in \
+    linux_os/guide/auditing/auditd_configure_rules/audit_execution_selinux_commands/audit_rules_execution_semanage/rule.yml \
+    linux_os/guide/auditing/auditd_configure_rules/audit_execution_selinux_commands/audit_rules_execution_setfiles/rule.yml \
+    linux_os/guide/auditing/auditd_configure_rules/audit_execution_selinux_commands/audit_rules_execution_setsebool/rule.yml \
+    linux_os/guide/services/http/securing_httpd/httpd_configure_os_protect_web_server/httpd_antivirus_scan_uploads/rule.yml \
+    linux_os/guide/system/software/integrity/endpoint_security_software/install_hids/rule.yml
+  do
+    echo "=== $file ==="
+    if grep -qP '\{\{[%{#]' "$file"; then
+      python3 utils/strip_jinja_for_yamllint.py "$file" | yamllint -c .yamllint -
+    else
+      yamllint -c .yamllint "$file"
+    fi
+  done
   ```
+  Note: plain `yamllint -c .yamllint <file>` alone is **not** sufficient for the audit trio, since they contain top-level Jinja macros that plain YAML misparses as a syntax error. The command above replicates the project's actual `ci_lint.yml` logic, which strips Jinja constructs before linting.
   ![yamllint output](yamllint_dod.JPG)
 
 - [ ] `./build_product rhel9 --datastream` completes without errors
@@ -188,9 +284,9 @@ Cloned the repository and located all six candidate files referenced in the main
 
 ### Code Changes
 
-- **Files modified:** `audit_rules_execution_semanage/rule.yml`, `audit_rules_execution_setfiles/rule.yml`, `audit_rules_execution_setsebool/rule.yml`, `httpd_antivirus_scan_uploads/rule.yml`, `install_hids/rule.yml`
+- **Files modified:** `audit_rules_execution_semanage/rule.yml` (DoD wording + one-line trailing-whitespace cleanup), `audit_rules_execution_setfiles/rule.yml`, `audit_rules_execution_setsebool/rule.yml`, `httpd_antivirus_scan_uploads/rule.yml`, `install_hids/rule.yml`
 - **Key commits:** [To be added]
-- **Approach decisions:** Kept edits to a single sentence or paragraph per file rather than rewording surrounding context, to keep the diff minimal and reviewable. Left `mcafee_security_software/group.yml` out of this PR rather than guessing at a generalized version of a DoD-mandated product requirement.
+- **Approach decisions:** Kept edits to a single sentence or paragraph per file rather than rewording surrounding context, to keep the diff minimal and reviewable. Left `mcafee_security_software/group.yml` out of this PR rather than guessing at a generalized version of a DoD-mandated product requirement. Included the trailing-whitespace fix on `audit_rules_execution_semanage/rule.yml` in this PR rather than opening a separate one, since it's a one-character fix on a file already being touched and falls under CONTRIBUTING.md's exception for small textual changes that don't shift meaning.
 
 ---
 
@@ -216,6 +312,8 @@ Learned to distinguish between DoD wording that's incidental to a generic securi
 ### Challenges Overcome
 
 The original issue's grep output only showed a couple of lines of context per match, which wasn't enough to safely edit any of the files without first reading them in full. Some DoD mentions turned out to be load-bearing (banner text matched by a check, a McAfee-mandate rule) rather than incidental, and that distinction wasn't visible from the grep snippet alone.
+
+Running plain `yamllint` on the three audit rule files produced a syntax error that initially appeared to be caused by the edit. Tracing it back to the original, unedited file confirmed it was pre-existing, caused by a top-level Jinja macro that plain YAML cannot parse on its own. Checking the project's own `ci_lint.yml` workflow confirmed this is expected and already handled in CI via `utils/strip_jinja_for_yamllint.py`, which strips Jinja constructs before linting. This was a useful reminder to verify against the project's actual CI logic rather than assuming a generic tool's output applies directly.
 
 ### What I'd Do Differently Next Time
 
