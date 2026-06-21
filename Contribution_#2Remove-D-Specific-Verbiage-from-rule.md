@@ -12,7 +12,7 @@
 
 ## Why I Chose This Issue
 
-After contribution #1 closed, I wanted a second issue in which the design direction had already been validated by a maintainer, rather than one I'd have to resolve myself mid-PR. Issue #8709 fit that: it carries the "good first issue" label, a prior contributor's partial fix was already merged and confirmed as correct by the maintainer, and on October 9, 2025, the maintainer posted a fresh grep of all remaining DoD-specific text across the codebase, showing 119 occurrences across 37 files and explicitly inviting further triage. That gave me a concrete, maintainer-approved worklist to draw from instead of an open question, which was the gap that caused #1 to stall.
+After contribution #1 closed, I wanted a second issue in which the design direction had already been validated by a maintainer, rather than one I'd have to resolve myself mid-PR. Issue #8709 fit that: it carries the "good first issue" label, a prior contributor opened a PR (#13622) covering part of this list, which the maintainer confirmed on October 9, 2025 matched the intended direction, and that same comment included a fresh grep of all remaining DoD-specific text across the codebase, showing 119 occurrences across 37 files and explicitly inviting further triage. That gave me a concrete, maintainer-approved worklist to draw from instead of an open question, which was the gap that caused #1 to stall.
 
 ---
 
@@ -95,20 +95,18 @@ Reword each occurrence to describe the underlying security requirement without D
 
 ### Fix Approach (How It Was Solved)
 
-Edits were applied in three steps, in this order:
-
-**Step 1: the three audit rule files (identical single-line change in each), via `sed`:**
+All three edits are combined into a single block below. It is safe to run multiple times (idempotent): the `sed`/Python steps only change text that still matches the original DoD wording, so re-running against already-fixed files is a no-op rather than a double-edit.
 
 ```bash
+cd ~/Desktop/content
+
+# Step 1: audit trio wording fix
 sed -i 's/DoD has defined the list of events for which the operating system will provide an audit record generation capability as the following:/The list of events for which the operating system must provide an audit record generation capability includes the following:/' \
   ./linux_os/guide/auditing/auditd_configure_rules/audit_execution_selinux_commands/audit_rules_execution_semanage/rule.yml \
   ./linux_os/guide/auditing/auditd_configure_rules/audit_execution_selinux_commands/audit_rules_execution_setfiles/rule.yml \
   ./linux_os/guide/auditing/auditd_configure_rules/audit_execution_selinux_commands/audit_rules_execution_setsebool/rule.yml
-```
 
-**Step 2: the two multi-line/multi-sentence files, via a Python exact-match replace** (chosen over `sed` because the original text spans multiple lines with parentheses, which `sed` cannot match cleanly):
-
-```bash
+# Step 2: httpd + install_hids wording fix (multi-line, exact-match Python replace)
 python3 << 'PYEOF'
 import pathlib
 
@@ -154,32 +152,31 @@ for edit in edits:
     p = pathlib.Path(edit["path"])
     text = p.read_text()
     if edit["old"] not in text:
-        print(f"NOT FOUND in {edit['path']} -- no changes made")
+        print(f"SKIPPED (already applied or text not found): {edit['path']}")
         continue
     p.write_text(text.replace(edit["old"], edit["new"]))
     print(f"Updated {edit['path']}")
 PYEOF
-```
 
-**Step 3: an incidental trailing-whitespace cleanup**, found while lint-checking `audit_rules_execution_semanage/rule.yml` (see "Pre-Existing Lint Issue" below). Since this PR already modifies that file, the one-character fix was made in the same PR rather than left for a separate one:
-
-```bash
+# Step 3: trailing-whitespace cleanup on semanage (pre-existing issue, unrelated to DoD wording)
 sed -i '30s/[ \t]*$//' linux_os/guide/auditing/auditd_configure_rules/audit_execution_selinux_commands/audit_rules_execution_semanage/rule.yml
 ```
 
-After each step, the change was verified with:
+### Verification Order (must be run in this sequence, after the fix block above)
 
-```bash
-git diff
-```
+The fix must be applied **before** any of the checks below are meaningful. A lint or build pass run against files that still contain the original DoD wording does not verify this fix; it only verifies the file is syntactically valid, which was already true before any edit.
 
-to confirm only the intended lines changed and no whitespace or indentation was disturbed elsewhere.
+1. Confirm wording is actually gone (see "No DoD references remain" in Testing Strategy below)
+2. Run the project's CI-equivalent lint check (see Testing Strategy)
+3. Run the full product build (see Testing Strategy)
+
+Each of the three checkboxes in Testing Strategy should be marked complete only after step 1 above confirms the wording fix is present in the working tree.
 
 ### Pre-Existing Lint Issue Discovered (Not Caused by This PR)
 
 Running plain `yamllint` against the three audit rule files initially produced a `syntax error: could not find expected ':'`. Investigation traced this to a top-level Jinja macro call (`{{{ ocil_fix_srg_privileged_command(...) }}}`) that plain YAML misreads as the start of a flow-mapping. This was confirmed to be **pre-existing and unrelated to this PR** by parsing the original, unedited file directly: the same error occurs at the same line before any DoD-wording edit is applied.
 
-The project's own CI (`.github/workflows/ci_lint.yml`) already accounts for this: any file containing Jinja constructs is piped through `utils/strip_jinja_for_yamllint.py` before linting, rather than linted directly. Reproducing that exact CI logic locally:
+The project's own CI (`.github/workflows/ci_lint.yml`) already accounts for this: any file containing Jinja constructs is piped through `utils/strip_jinja_for_yamllint.py` before linting, rather than being linted directly. Reproducing that exact CI logic locally:
 
 ```bash
 for file in \
@@ -232,6 +229,20 @@ No new Automatus test scenarios are required, since this PR makes no changes to 
 
 ### Integration Tests
 
+**Verification Status Note:** An earlier lint and build pass was recorded for this repo, but a subsequent re-clone (to reconfirm the original bug state) reset all file edits, including the trio's wording fix. The lint/build passes that were recorded did not actually prove the wording fix, since neither checks prose content — they only validate YAML syntax and build mechanics, which pass regardless of whether the DoD wording is present. All three boxes below are reset to unchecked until reconfirmed against the actual edited content in one pass.
+
+- [ ] No DoD references remain in the five modified files
+  ```bash
+  grep -n "DoD" \
+    ./linux_os/guide/auditing/auditd_configure_rules/audit_execution_selinux_commands/audit_rules_execution_semanage/rule.yml \
+    ./linux_os/guide/auditing/auditd_configure_rules/audit_execution_selinux_commands/audit_rules_execution_setfiles/rule.yml \
+    ./linux_os/guide/auditing/auditd_configure_rules/audit_execution_selinux_commands/audit_rules_execution_setsebool/rule.yml \
+    ./linux_os/guide/services/http/securing_httpd/httpd_configure_os_protect_web_server/httpd_antivirus_scan_uploads/rule.yml \
+    ./linux_os/guide/system/software/integrity/endpoint_security_software/install_hids/rule.yml
+  ```
+  (expected: no output, confirming all DoD references were removed)
+  ![after fix grep confirmation](fix_dod.JPG)
+
 - [ ] Project's CI-equivalent lint check passes on all five modified files
   ```bash
   for file in \
@@ -250,27 +261,15 @@ No new Automatus test scenarios are required, since this PR makes no changes to 
   done
   ```
   Note: plain `yamllint -c .yamllint <file>` alone is **not** sufficient for the audit trio, since they contain top-level Jinja macros that plain YAML misparses as a syntax error. The command above replicates the project's actual `ci_lint.yml` logic, which strips Jinja constructs before linting.
-
-
-  ![yamllint output](dod_1.JPG)
+  ![yamllint output](yamllint_dod.JPG)
 
 - [ ] `./build_product rhel9 --datastream` completes without errors
   ```bash
   ./build_product rhel9 --datastream
   ```
-  ![build output](dod_2.JPG)
+  ![build output](build_dod.JPG)
 
-- [ ] No DoD references remain in the five modified files
-  ```bash
-  grep -n "DoD" \
-    ./linux_os/guide/auditing/auditd_configure_rules/audit_execution_selinux_commands/audit_rules_execution_semanage/rule.yml \
-    ./linux_os/guide/auditing/auditd_configure_rules/audit_execution_selinux_commands/audit_rules_execution_setfiles/rule.yml \
-    ./linux_os/guide/auditing/auditd_configure_rules/audit_execution_selinux_commands/audit_rules_execution_setsebool/rule.yml \
-    ./linux_os/guide/services/http/securing_httpd/httpd_configure_os_protect_web_server/httpd_antivirus_scan_uploads/rule.yml \
-    ./linux_os/guide/system/software/integrity/endpoint_security_software/install_hids/rule.yml
-  ```
-  (expected: no output, confirming all DoD references were removed)
-  ![after fix grep confirmation](fix_dod.JPG)
+**Run order:** the grep check (DoD removed) must pass before the lint/build checks are meaningful, since lint and build do not validate wording content.
 
 ### Manual Testing
 
@@ -282,7 +281,7 @@ Manually re-read each of the five modified files after editing to confirm the YA
 
 ### Week 1 Progress
 
-Cloned the repository and located all six candidate files referenced in the maintainer's grep output. Read full file contents (not just the grep snippets) to understand the complete context around each DoD mention. Drafted before/after wording for five files. Identified that `mcafee_security_software/group.yml` is fundamentally different from the other five, since its entire content is a DoD-specific mandate with no generic equivalent, and set it aside to avoid misrepresenting the rule's purpose. Posted a scoping comment on the issue before starting edits, naming exactly which files this PR would cover, to avoid the ambiguity that caused contribution #1's PR to be closed.
+Cloned the repository and located all six candidate files referenced in the maintainer's grep output. Read full file contents (not just the grep snippets) to understand the complete context around each DoD mention. Drafted before/after wording for five files. Identified that `mcafee_security_software/group.yml` is fundamentally different from the other five, since its entire content is a DoD-specific mandate with no generic equivalent, and set it aside to avoid misrepresenting the rule's purpose. Drafted a scoping comment for the issue, naming exactly which files this PR would cover, to avoid the ambiguity that caused contribution #1's PR to be closed; posting it to the live issue is a remaining step before opening the PR.
 
 ### Code Changes
 
@@ -301,7 +300,7 @@ Cloned the repository and located all six candidate files referenced in the main
 **Maintainer Feedback:**
 - [Pending]
 
-**Status:** Not yet opened. Comment posted on issue scoping this subset, edits drafted, local lint/build verification pending.
+**Status:** Not yet opened. Scoping comment drafted (not yet confirmed and posted to the live issue); edits drafted; local lint/build verification pending.
 
 ---
 
@@ -326,7 +325,7 @@ Pull the full file content before triaging matches into "easy/medium/hard" bucke
 ## Resources Used
 
 - [ComplianceAsCode/content issue #8709](https://github.com/ComplianceAsCode/content/issues/8709)
-- [ComplianceAsCode/content PR #13622 (merged precedent)](https://github.com/ComplianceAsCode/content/pull/13622)
+- [ComplianceAsCode/content PR #13622 (prior PR covering part of this issue; maintainer confirmed direction, merge status not independently verified)](https://github.com/ComplianceAsCode/content/pull/13622)
 - [ComplianceAsCode Style Guide](https://complianceascode.readthedocs.io/en/latest/manual/developer/04_style_guide.html)
 - [ComplianceAsCode Contributing Guidelines (CONTRIBUTING.md)](https://github.com/ComplianceAsCode/content/blob/master/CONTRIBUTING.md)
 - [ComplianceAsCode Developer Guide](https://complianceascode.readthedocs.io/)
