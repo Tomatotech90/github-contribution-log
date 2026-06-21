@@ -12,7 +12,7 @@
 
 ## Why I Chose This Issue
 
-After contribution #1 closed, I wanted a second issue in which the design direction had already been validated by a maintainer, rather than one I'd have to resolve myself mid-PR. Issue #8709 fit that: it carries the "good first issue" label, a prior contributor's partial fix was already merged and confirmed as correct by the maintainer, and on October 9, 2025, the maintainer posted a fresh grep of all remaining DoD-specific text across the codebase — 119 occurrences across 37 files — explicitly inviting further triage. That gave me a concrete, maintainer-approved worklist to draw from instead of an open question, which was the gap that caused #1 to stall.
+After contribution #1 closed, I wanted a second issue in which the design direction had already been validated by a maintainer, rather than one I'd have to resolve myself mid-PR. Issue #8709 fit that: it carries the "good first issue" label, a prior contributor's partial fix was already merged and confirmed as correct by the maintainer, and on October 9, 2025, the maintainer posted a fresh grep of all remaining DoD-specific text across the codebase, showing 119 occurrences across 37 files and explicitly inviting further triage. That gave me a concrete, maintainer-approved worklist to draw from instead of an open question, which was the gap that caused #1 to stall.
 
 ---
 
@@ -49,13 +49,37 @@ Repository cloned locally (`ComplianceAsCode/content`, `master` branch) inside t
 ### Steps Taken to Identify Affected Files
 
 1. Used the maintainer's October 9, 2025, grep output on the issue thread as the starting worklist (119 occurrences across 37 files).
-2. Located the six candidate files locally via `find. -iname "<rule_name>" -type d`, confirming the maintainer's grep paths matched the local clone exactly.
-3. Read the full content of each file (`cat`) rather than relying on the few lines of context shown in the issue's grep output, to see the complete surrounding `rationale`/`vuldiscussion`/`warnings` block before editing.
+2. Located the six candidate files locally:
+   ```bash
+   find . -iname "audit_rules_execution_semanage" -type d
+   find . -iname "audit_rules_execution_setfiles" -type d
+   find . -iname "audit_rules_execution_setsebool" -type d
+   find . -iname "httpd_antivirus_scan_uploads" -type d
+   find . -iname "install_hids" -type d
+   find . -iname "mcafee_security_software" -type d
+   ```
+   This confirmed the maintainer's grep paths matched the local clone exactly.
+3. Read the full content of each file rather than relying on the few lines of context shown in the issue's grep output, to see the complete surrounding `rationale`/`vuldiscussion`/`warnings` block before editing.
 4. Triaged each occurrence into three categories based on whether the DoD reference was incidental prose, a value that should become an XCCDF variable, or a DoD-only requirement with no generic equivalent.
+5. Confirmed the exact file and line number of each DoD reference in the five in-scope files:
+   ```bash
+   grep -n "DoD" \
+     ./linux_os/guide/auditing/auditd_configure_rules/audit_execution_selinux_commands/audit_rules_execution_semanage/rule.yml \
+     ./linux_os/guide/auditing/auditd_configure_rules/audit_execution_selinux_commands/audit_rules_execution_setfiles/rule.yml \
+     ./linux_os/guide/auditing/auditd_configure_rules/audit_execution_selinux_commands/audit_rules_execution_setsebool/rule.yml \
+     ./linux_os/guide/services/http/securing_httpd/httpd_configure_os_protect_web_server/httpd_antivirus_scan_uploads/rule.yml \
+     ./linux_os/guide/system/software/integrity/endpoint_security_software/install_hids/rule.yml
+   ```
 
 ### Reproduction Evidence
 
-**Findings:** Of the six files initially considered, five contain DoD-specific wording that is incidental to a generic security requirement and can be safely generalized. The sixth, `mcafee_security_software/group.yml`, names a DoD-mandated product (McAfee HBSS/VSEL) with no generic equivalent — this is being set aside rather than edited (see Learnings below).
+**Bug Reproduction Screenshot:**
+
+![DoD references located via grep](bug_dod.JPG)
+
+The screenshot above shows the exact file and line number for each DoD-specific occurrence in the five in-scope files, confirming the issue is present in the local clone before any edits are made.
+
+**Findings:** Of the six files initially considered, five contain DoD-specific wording that is incidental to a generic security requirement and can be safely generalized. The sixth, `mcafee_security_software/group.yml`, names a DoD-mandated product (McAfee HBSS/VSEL) with no generic equivalent. This file is being set aside rather than edited (see Learnings below).
 
 ---
 
@@ -67,7 +91,27 @@ The DoD-specific wording in the five in-scope files falls into two patterns: boi
 
 ### Proposed Solution
 
-Reword each occurrence to describe the underlying security requirement without DoD-specific framing, while preserving the technical content and intent of the original text. No XCCDF variable changes are needed for this batch, since none of the affected text resolves to a profile-specific value — it's prose describing rationale, not a configurable setting.
+Reword each occurrence to describe the underlying security requirement without DoD-specific framing, while preserving the technical content and intent of the original text. No XCCDF variable changes are needed for this batch, since none of the affected text resolves to a profile-specific value; it's prose describing rationale, not a configurable setting.
+
+### Fix Approach (How It Was Solved)
+
+Each file was opened directly in a text editor, and the targeted sentence or paragraph was replaced by hand, rather than using a scripted find-and-replace, since the surrounding YAML block structure (indentation, literal block scalars) needed to stay intact:
+
+```bash
+nano ./linux_os/guide/auditing/auditd_configure_rules/audit_execution_selinux_commands/audit_rules_execution_semanage/rule.yml
+nano ./linux_os/guide/auditing/auditd_configure_rules/audit_execution_selinux_commands/audit_rules_execution_setfiles/rule.yml
+nano ./linux_os/guide/auditing/auditd_configure_rules/audit_execution_selinux_commands/audit_rules_execution_setsebool/rule.yml
+nano ./linux_os/guide/services/http/securing_httpd/httpd_configure_os_protect_web_server/httpd_antivirus_scan_uploads/rule.yml
+nano ./linux_os/guide/system/software/integrity/endpoint_security_software/install_hids/rule.yml
+```
+
+After each edit, the change was verified with:
+
+```bash
+git diff <path/to/rule.yml>
+```
+
+to confirm only the intended sentence changed and no whitespace or indentation was disturbed.
 
 ### Implementation Plan
 
@@ -87,7 +131,7 @@ Using UMPIRE framework (adapted):
 
 **Implement:** [Link to branch/commits as work progresses]
 
-**Review:** Confirm field order in each modified `rule.yml` is unchanged (no fields added/removed/reordered — edits are prose-only within existing `vuldiscussion`/`rationale`/`warnings` blocks), and confirm none of the edited text shifts the underlying technical meaning of the requirement.
+**Review:** Confirm field order in each modified `rule.yml` is unchanged (no fields added, removed, or reordered; edits are prose-only within existing `vuldiscussion`/`rationale`/`warnings` blocks), and confirm none of the edited text shifts the underlying technical meaning of the requirement.
 
 **Evaluate:** Re-read each modified file end-to-end after editing to confirm the surrounding paragraph still reads naturally, and the security intent is unchanged.
 
@@ -97,12 +141,38 @@ Using UMPIRE framework (adapted):
 
 ### Unit Tests
 
-No new Automatus test scenarios are required, since this PR makes no changes to OVAL checks, remediations, or rule logic — only prose wording. Existing tests for the five affected rules should pass unmodified.
+No new Automatus test scenarios are required, since this PR makes no changes to OVAL checks, remediations, or rule logic, only prose wording. Existing tests for the five affected rules should pass unmodified.
 
 ### Integration Tests
 
-- [ ] `yamllint -c .yamllint` passes on all five modified files
+- [ ] `yamllint` passes on all five modified files
+  ```bash
+  yamllint -c .yamllint \
+    ./linux_os/guide/auditing/auditd_configure_rules/audit_execution_selinux_commands/audit_rules_execution_semanage/rule.yml \
+    ./linux_os/guide/auditing/auditd_configure_rules/audit_execution_selinux_commands/audit_rules_execution_setfiles/rule.yml \
+    ./linux_os/guide/auditing/auditd_configure_rules/audit_execution_selinux_commands/audit_rules_execution_setsebool/rule.yml \
+    ./linux_os/guide/services/http/securing_httpd/httpd_configure_os_protect_web_server/httpd_antivirus_scan_uploads/rule.yml \
+    ./linux_os/guide/system/software/integrity/endpoint_security_software/install_hids/rule.yml
+  ```
+  ![yamllint output](yamllint_dod.JPG)
+
 - [ ] `./build_product rhel9 --datastream` completes without errors
+  ```bash
+  ./build_product rhel9 --datastream
+  ```
+  ![build output](build_dod.JPG)
+
+- [ ] No DoD references remain in the five modified files
+  ```bash
+  grep -n "DoD" \
+    ./linux_os/guide/auditing/auditd_configure_rules/audit_execution_selinux_commands/audit_rules_execution_semanage/rule.yml \
+    ./linux_os/guide/auditing/auditd_configure_rules/audit_execution_selinux_commands/audit_rules_execution_setfiles/rule.yml \
+    ./linux_os/guide/auditing/auditd_configure_rules/audit_execution_selinux_commands/audit_rules_execution_setsebool/rule.yml \
+    ./linux_os/guide/services/http/securing_httpd/httpd_configure_os_protect_web_server/httpd_antivirus_scan_uploads/rule.yml \
+    ./linux_os/guide/system/software/integrity/endpoint_security_software/install_hids/rule.yml
+  ```
+  (expected: no output, confirming all DoD references were removed)
+  ![after fix grep confirmation](fix_dod.JPG)
 
 ### Manual Testing
 
@@ -114,7 +184,7 @@ Manually re-read each of the five modified files after editing to confirm the YA
 
 ### Week 1 Progress
 
-Cloned the repository and located all six candidate files referenced in the maintainer's grep output. Read full file contents (not just the grep snippets) to understand the complete context around each DoD mention. Drafted before/after wording for five files. Identified that `mcafee_security_software/group.yml` is fundamentally different from the other five — its entire content is a DoD-specific mandate with no generic equivalent — and set it aside to avoid misrepresenting the rule's purpose. Posted a scoping comment on the issue before starting edits, naming exactly which files this PR would cover, to avoid the ambiguity that caused contribution #1's PR to be closed.
+Cloned the repository and located all six candidate files referenced in the maintainer's grep output. Read full file contents (not just the grep snippets) to understand the complete context around each DoD mention. Drafted before/after wording for five files. Identified that `mcafee_security_software/group.yml` is fundamentally different from the other five, since its entire content is a DoD-specific mandate with no generic equivalent, and set it aside to avoid misrepresenting the rule's purpose. Posted a scoping comment on the issue before starting edits, naming exactly which files this PR would cover, to avoid the ambiguity that caused contribution #1's PR to be closed.
 
 ### Code Changes
 
@@ -133,7 +203,7 @@ Cloned the repository and located all six candidate files referenced in the main
 **Maintainer Feedback:**
 - [Pending]
 
-**Status:** Not yet opened — comment posted on issue scoping this subset, edits drafted, local lint/build verification pending.
+**Status:** Not yet opened. Comment posted on issue scoping this subset, edits drafted, local lint/build verification pending.
 
 ---
 
@@ -141,15 +211,15 @@ Cloned the repository and located all six candidate files referenced in the main
 
 ### Technical Skills Gained
 
-Learned to distinguish between DoD wording that's incidental to a generic security requirement versus DoD wording that constitutes the entire substance of a rule (as with `mcafee_security_software`), and that this distinction — not just "does the text mention DoD" — is what determines whether a file belongs in this kind of PR.
+Learned to distinguish between DoD wording that's incidental to a generic security requirement and DoD wording that constitutes the entire substance of a rule, as with `mcafee_security_software`. This distinction, not just whether the text mentions DoD, is what determines whether a file belongs in this kind of PR.
 
 ### Challenges Overcome
 
-The original issue's grep output only showed a couple of lines of context per match, which wasn't enough to safely edit any of the files without first reading them in full — some DoD mentions turned out to be load-bearing (banner text matched by a check, a McAfee-mandate rule) rather than incidental. That distinction wasn't visible from the grep snippet alone.
+The original issue's grep output only showed a couple of lines of context per match, which wasn't enough to safely edit any of the files without first reading them in full. Some DoD mentions turned out to be load-bearing (banner text matched by a check, a McAfee-mandate rule) rather than incidental, and that distinction wasn't visible from the grep snippet alone.
 
 ### What I'd Do Differently Next Time
 
-Pull the full file content before triaging matches into "easy/medium/hard" buckets, rather than triaging from grep snippets first — a couple of files initially looked like easy wins from the snippet alone. Still, they turned out to require more judgment once the full file was visible.
+Pull the full file content before triaging matches into "easy/medium/hard" buckets, rather than triaging from grep snippets first. A couple of files initially looked like easy wins from the snippet alone, but turned out to require more judgment once the full file was visible.
 
 ---
 
