@@ -250,13 +250,15 @@ No new Automatus test scenarios are required, since this PR makes no changes to 
   done
   ```
   Note: plain `yamllint -c .yamllint <file>` alone is **not** sufficient for the audit trio, since they contain top-level Jinja macros that plain YAML misparses as a syntax error. The command above replicates the project's actual `ci_lint.yml` logic, which strips Jinja constructs before linting.
-  ![yamllint output](yamllint_dod.JPG)
+
+
+  ![yamllint output](dod_1.JPG)
 
 - [ ] `./build_product rhel9 --datastream` completes without errors
   ```bash
   ./build_product rhel9 --datastream
   ```
-  ![build output](build_dod.JPG)
+  ![build output](dod_2.JPG)
 
 - [ ] No DoD references remain in the five modified files
   ```bash
