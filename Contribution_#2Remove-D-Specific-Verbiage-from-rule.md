@@ -12,7 +12,7 @@
 
 ## Why I Chose This Issue
 
-After contribution #1 closed, I wanted a second issue where the design direction was already validated by a maintainer rather than something I'd have to resolve myself mid-PR. Issue #8709 fit that: it carries the "good first issue" label, a prior contributor's partial fix was already merged and confirmed as correct by the maintainer, and on October 9, 2025 the maintainer posted a fresh grep of all remaining DoD-specific text across the codebase — 119 occurrences across 37 files — explicitly inviting further triage. That gave me a concrete, maintainer-approved worklist to draw from instead of an open question, which was the gap that caused #1 to stall.
+After contribution #1 closed, I wanted a second issue in which the design direction had already been validated by a maintainer, rather than one I'd have to resolve myself mid-PR. Issue #8709 fit that: it carries the "good first issue" label, a prior contributor's partial fix was already merged and confirmed as correct by the maintainer, and on October 9, 2025, the maintainer posted a fresh grep of all remaining DoD-specific text across the codebase — 119 occurrences across 37 files — explicitly inviting further triage. That gave me a concrete, maintainer-approved worklist to draw from instead of an open question, which was the gap that caused #1 to stall.
 
 ---
 
@@ -20,11 +20,11 @@ After contribution #1 closed, I wanted a second issue where the design direction
 
 ### Problem Description
 
-Several rule and group YAML files describe security requirements using organization-specific phrasing tied to DoD, even though the underlying requirement applies to any organization using the benchmark. This includes generic concepts framed as a DoD-specific mandate (audit event capability descriptions), named DoD forms standing in for a generic process (System Authorization Access Request), and named DoD-only tooling and contact references baked into otherwise generic guidance (McAfee HBSS, cyber.mil).
+Several rules and group YAML files describe security requirements using organization-specific phrasing tied to DoD, even though the underlying requirement applies to any organization using the benchmark. This includes generic concepts framed as a DoD-specific mandate (audit event capability descriptions), named DoD forms standing in for a generic process (System Authorization Access Request), and named DoD-only tooling and contact references baked into otherwise generic guidance (McAfee HBSS, cyber.mil).
 
 ### Expected Behavior
 
-Rule content should describe security requirements in policy-agnostic language. Where a concrete value genuinely differs by policy, it should be expressed through an XCCDF variable resolved per-profile, not hardcoded prose. Where the underlying requirement applies universally, DoD-specific naming should simply be removed or generalized.
+Rule content should describe security requirements in policy-agnostic language. Where a concrete value genuinely varies by policy, it should be expressed through an XCCDF variable resolved per profile, not as hardcoded prose. Where the underlying requirement applies universally, DoD-specific naming should simply be removed or generalized.
 
 ### Current Behavior
 
@@ -48,8 +48,8 @@ Repository cloned locally (`ComplianceAsCode/content`, `master` branch) inside t
 
 ### Steps Taken to Identify Affected Files
 
-1. Used the maintainer's October 9, 2025 grep output on the issue thread as the starting worklist (119 occurrences across 37 files).
-2. Located the six candidate files locally via `find . -iname "<rule_name>" -type d`, confirming the maintainer's grep paths matched the local clone exactly.
+1. Used the maintainer's October 9, 2025, grep output on the issue thread as the starting worklist (119 occurrences across 37 files).
+2. Located the six candidate files locally via `find. -iname "<rule_name>" -type d`, confirming the maintainer's grep paths matched the local clone exactly.
 3. Read the full content of each file (`cat`) rather than relying on the few lines of context shown in the issue's grep output, to see the complete surrounding `rationale`/`vuldiscussion`/`warnings` block before editing.
 4. Triaged each occurrence into three categories based on whether the DoD reference was incidental prose, a value that should become an XCCDF variable, or a DoD-only requirement with no generic equivalent.
 
@@ -63,7 +63,7 @@ Repository cloned locally (`ComplianceAsCode/content`, `master` branch) inside t
 
 ### Analysis
 
-The DoD-specific wording in the five in-scope files falls into two patterns: boilerplate narrative text copy-pasted across multiple audit rules that frames a generic audit capability as a DoD requirement, and named DoD-specific entities (a form number, a product name, a government contact URL) standing in for a generic process or capability that any organization could substitute their own equivalent for.
+The DoD-specific wording in the five in-scope files falls into two patterns: boilerplate narrative text copied across multiple audit rules that frames a generic audit capability as a DoD requirement, and named DoD-specific entities (a form number, a product name, a government contact URL) standing in for a generic process or capability that any organization could substitute its own equivalent for.
 
 ### Proposed Solution
 
@@ -89,7 +89,7 @@ Using UMPIRE framework (adapted):
 
 **Review:** Confirm field order in each modified `rule.yml` is unchanged (no fields added/removed/reordered — edits are prose-only within existing `vuldiscussion`/`rationale`/`warnings` blocks), and confirm none of the edited text shifts the underlying technical meaning of the requirement.
 
-**Evaluate:** Re-read each modified file end-to-end after editing to confirm the surrounding paragraph still reads naturally and the security intent is unchanged.
+**Evaluate:** Re-read each modified file end-to-end after editing to confirm the surrounding paragraph still reads naturally, and the security intent is unchanged.
 
 ---
 
@@ -106,7 +106,7 @@ No new Automatus test scenarios are required, since this PR makes no changes to 
 
 ### Manual Testing
 
-Manually re-read each of the five modified files after editing to confirm YAML structure is valid, field order is unchanged, and the rewritten prose preserves the original security rationale.
+Manually re-read each of the five modified files after editing to confirm the YAML structure is valid, the field order is unchanged, and the rewritten prose preserves the original security rationale.
 
 ---
 
@@ -114,7 +114,7 @@ Manually re-read each of the five modified files after editing to confirm YAML s
 
 ### Week 1 Progress
 
-Cloned the repository and located all six candidate files referenced in the maintainer's grep output. Read full file contents (not just the grep snippets) to understand the complete context around each DoD mention. Drafted before/after wording for five files. Identified that `mcafee_security_software/group.yml` is fundamentally different from the other five — its entire content is a DoD-specific mandate with no generic equivalent — and set it aside rather than risk misrepresenting the rule's purpose. Posted a scoping comment on the issue before starting edits, naming exactly which files this PR would cover, to avoid the ambiguity that caused contribution #1's PR to be closed.
+Cloned the repository and located all six candidate files referenced in the maintainer's grep output. Read full file contents (not just the grep snippets) to understand the complete context around each DoD mention. Drafted before/after wording for five files. Identified that `mcafee_security_software/group.yml` is fundamentally different from the other five — its entire content is a DoD-specific mandate with no generic equivalent — and set it aside to avoid misrepresenting the rule's purpose. Posted a scoping comment on the issue before starting edits, naming exactly which files this PR would cover, to avoid the ambiguity that caused contribution #1's PR to be closed.
 
 ### Code Changes
 
@@ -145,11 +145,11 @@ Learned to distinguish between DoD wording that's incidental to a generic securi
 
 ### Challenges Overcome
 
-The original issue's grep output only showed a couple of lines of context per match, which wasn't enough to safely edit any of the files without first reading them in full — some DoD mentions turned out to be load-bearing (banner text matched by a check, a McAfee-mandate rule) rather than incidental, and that distinction wasn't visible from the grep snippet alone.
+The original issue's grep output only showed a couple of lines of context per match, which wasn't enough to safely edit any of the files without first reading them in full — some DoD mentions turned out to be load-bearing (banner text matched by a check, a McAfee-mandate rule) rather than incidental. That distinction wasn't visible from the grep snippet alone.
 
 ### What I'd Do Differently Next Time
 
-Pull full file content before triaging matches into "easy/medium/hard" buckets, rather than triaging from grep snippets first — a couple of files initially looked like easy wins from the snippet alone and turned out to need more judgment once the full file was visible.
+Pull the full file content before triaging matches into "easy/medium/hard" buckets, rather than triaging from grep snippets first — a couple of files initially looked like easy wins from the snippet alone. Still, they turned out to require more judgment once the full file was visible.
 
 ---
 
