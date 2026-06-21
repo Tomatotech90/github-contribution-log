@@ -1,4 +1,4 @@
-# Contribution #1: Label the TLS in vmmap
+# Contribution #1: Label the TLS in vmmap (closed)
 
 **Contribution Number:** 1
 
