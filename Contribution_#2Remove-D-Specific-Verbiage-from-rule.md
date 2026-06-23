@@ -6,7 +6,7 @@
 
 **Issue:** [https://github.com/ComplianceAsCode/content/issues/8709](https://github.com/ComplianceAsCode/content/issues/8709)
 
-**Status:** Phase I, In Progress
+**Status:** Phase III, In Progress
 
 ---
 
