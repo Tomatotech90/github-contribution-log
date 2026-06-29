@@ -303,9 +303,9 @@ Cloned the repository and located all six candidate files referenced in the main
 
 ## Pull Request
 
-**PR Link:** [To be submitted]
+**PR Link:**  https://github.com/ComplianceAsCode/content/pull/14834
 
-**PR Description:** [To be drafted]
+**PR Description:**  Remove DoD-specific verbiage from rule.yml files#14834
 
 **Maintainer Feedback:**
 - [Pending]
