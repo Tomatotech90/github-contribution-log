@@ -6,13 +6,13 @@
 
 **Issue:** [https://github.com/ComplianceAsCode/content/issues/8709](https://github.com/ComplianceAsCode/content/issues/8709)
 
-**Status:** Phase III, In Progress
+**Status:** Phase I, In Progress
 
 ---
 
 ## Why I Chose This Issue
 
-I have been exploring the ComplianceAsCode project, and I am genuinely impressed by the breadth of platforms and products it covers, from Red Hat Enterprise Linux and Fedora to Ubuntu, Debian, and SUSE Linux Enterprise Server, as well as products like Firefox. The goal of making it as easy as possible to write and maintain security content in all commonly used formats is something I find both practical and valuable, and the documentation, blog, and online workshops make it very approachable for new contributors. I would like to contribute to issue #8709.
+After contribution #1 closed, I wanted a second issue in which the design direction had already been validated by a maintainer, rather than one I'd have to resolve myself mid-PR. Issue #8709 fit that: it carries the "good first issue" label, a prior contributor opened a PR (#13622) covering part of this list which the maintainer confirmed on October 9, 2025 matched the intended direction, and that same comment included a fresh grep of all remaining DoD-specific text across the codebase, showing 119 occurrences across 37 files and explicitly inviting further triage. That gave me a concrete, maintainer-approved worklist to draw from instead of an open question, which was the gap that caused #1 to stall.
 
 ---
 
@@ -89,7 +89,7 @@ The screenshot above shows the exact file and line number for each DoD-specific 
 
 The issue's primary mechanism is replacing hardcoded policy-specific values with their corresponding XCCDF variable identifiers. For example, replacing the literal `15` in "The DoD requirement is 15" with `{{{ xccdf_value("var_accounts_password_minlen_login_defs") }}}`. That pattern applies to files where a DoD-specific numeric or string value is hardcoded in prose but already has an XCCDF variable defined for it.
 
-The five files in this PR do not follow that pattern. None of them contains a hardcoded value that should be expressed as a variable; they contain organizational prose (descriptions of audit event categories, a named government form, a named product, and a contact URL) that happens to reference DoD as an organization. For these files, the correct fix per `ggbecker`'s guidance is deletion or rewording to make the language policy-agnostic rather than variable substitution. This is consistent with `ggbecker's October 9, 2025, confirmation that `yungcero's approach ("definitely the intended changes") covered exactly this kind of prose generalization.
+The five files in this PR do not follow that pattern. None of them contain a hardcoded value that should be expressed as a variable; they contain organizational prose (descriptions of audit event categories, a named government form, a named product and contact URL) that happens to reference DoD as an organization. For these files, the correct fix per `ggbecker`'s guidance is deletion or rewording to make the language policy-agnostic, not variable substitution. This is consistent with `ggbecker`'s October 9, 2025 confirmation that `yungcero`'s approach ("definitely the intended changes") covered exactly this kind of prose generalization.
 
 ### Proposed Solution
 
@@ -180,13 +180,13 @@ The fix must be applied **before** any of the checks below are meaningful. A lin
 2. Run the project's CI-equivalent lint check (see Testing Strategy)
 3. Run the full product build (see Testing Strategy)
 
-Each of the three checkboxes in Testing Strategy should be marked complete only after it has been run, **after** step 1 above confirms the wording fix is present in the working tree.
+Each of the three checkboxes in Testing Strategy should only be marked complete once it has been run **after** step 1 above confirms the wording fix is present in the working tree.
 
 ### Pre-Existing Lint Issue Discovered (Not Caused by This PR)
 
 Running plain `yamllint` against the three audit rule files initially produced a `syntax error: could not find expected ':'`. Investigation traced this to a top-level Jinja macro call (`{{{ ocil_fix_srg_privileged_command(...) }}}`) that plain YAML misreads as the start of a flow-mapping. This was confirmed to be **pre-existing and unrelated to this PR** by parsing the original, unedited file directly: the same error occurs at the same line before any DoD-wording edit is applied.
 
-The project's own CI (`.github/workflows/ci_lint.yml`) already accounts for this: any file containing Jinja constructs is piped through `utils/strip_jinja_for_yamllint.py` before linting, rather than being linted directly. Reproducing that exact CI logic locally:
+The project's own CI (`.github/workflows/ci_lint.yml`) already accounts for this: any file containing Jinja constructs is piped through `utils/strip_jinja_for_yamllint.py` before linting, rather than linted directly. Reproducing that exact CI logic locally:
 
 ```bash
 for file in \
@@ -239,7 +239,7 @@ No new Automatus test scenarios are required, since this PR makes no changes to 
 
 ### Integration Tests
 
-**Verification Status Note:** An earlier lint and build pass was recorded for this repo, but a subsequent re-clone (to reconfirm the original bug state) reset all file edits, including the trio's wording fix. The lint/build passes that were recorded did not actually prove the wording fix, since neither checks prose content; they only validate YAML syntax and build mechanics, which pass regardless of whether the DoD wording is present. All three boxes below are reset to unchecked until reconfirmed against the actual edited content in one pass.
+**Verification Status Note:** An earlier lint and build pass was recorded against this repo, but a subsequent re-clone (done to re-confirm the original bug state) reset all file edits, including the trio's wording fix. The lint/build passes that were recorded did not actually prove the wording fix, since neither check inspects prose content; they only validate YAML syntax and build mechanics, which pass whether or not the DoD wording is present. All three boxes below are reset to unchecked until re-confirmed against the actual edited content in one pass.
 
 - [x] No DoD references remain in the five modified files
   ```bash
@@ -296,21 +296,21 @@ Cloned the repository and located all six candidate files referenced in the main
 ### Code Changes
 
 - **Files modified:** `audit_rules_execution_semanage/rule.yml` (DoD wording + one-line trailing-whitespace cleanup), `audit_rules_execution_setfiles/rule.yml`, `audit_rules_execution_setsebool/rule.yml`, `httpd_antivirus_scan_uploads/rule.yml`, `install_hids/rule.yml`
-- **Key commits:** [To be added]
+- **Key commits:** `470b8032bc` — Remove DoD-specific verbiage from rule.yml files
 - **Approach decisions:** Kept edits to a single sentence or paragraph per file rather than rewording surrounding context, to keep the diff minimal and reviewable. Left `mcafee_security_software/group.yml` out of this PR rather than guessing at a generalized version of a DoD-mandated product requirement. Included the trailing-whitespace fix on `audit_rules_execution_semanage/rule.yml` in this PR rather than opening a separate one, since it's a one-character fix on a file already being touched and falls under CONTRIBUTING.md's exception for small textual changes that don't shift meaning.
 
 ---
 
 ## Pull Request
 
-**PR Link:**  https://github.com/ComplianceAsCode/content/pull/14834
+**PR Link:** [To be submitted]
 
-**PR Description:**  Remove DoD-specific verbiage from rule.yml files#14834
+**PR Description:** [To be drafted]
 
 **Maintainer Feedback:**
 - [Pending]
 
-**Status:** Not yet opened. Scoping comment drafted (not yet confirmed and posted to the live issue); edits drafted; local lint/build verification pending.
+**Status:** Open. Awaiting maintainer review and CI workflow approval.
 
 ---
 
@@ -324,7 +324,7 @@ Learned to distinguish between DoD wording that's incidental to a generic securi
 
 The original issue's grep output only showed a couple of lines of context per match, which wasn't enough to safely edit any of the files without first reading them in full. Some DoD mentions turned out to be load-bearing (banner text matched by a check, a McAfee-mandate rule) rather than incidental, and that distinction wasn't visible from the grep snippet alone.
 
-Running plain `yamllint` on the three audit rule files produced a syntax error that initially appeared to be caused by the edit. Tracing it back to the original, unedited file confirmed it was pre-existing, caused by a top-level Jinja macro that plain YAML cannot parse on its own. Checking the project's own `ci_lint.yml` workflow confirmed this is expected and already handled in CI via `utils/strip_jinja_for_yamllint.py`, which strips Jinja constructs before linting. This was a useful reminder to verify against the project's actual CI logic rather than assuming a generic tool's output applies directly.
+Running plain `yamllint` against the three audit rule files produced a syntax error that initially looked like it might be caused by the edit. Tracing it back to the original, unedited file confirmed it was pre-existing, caused by a top-level Jinja macro that plain YAML cannot parse on its own. Checking the project's own `ci_lint.yml` workflow confirmed this is expected and already handled in CI via `utils/strip_jinja_for_yamllint.py`, which strips Jinja constructs before linting. This was a useful reminder to verify against the project's actual CI logic rather than assuming a generic tool's output applies directly.
 
 ### What I'd Do Differently Next Time
 
