@@ -6,7 +6,7 @@
 
 **Issue:** [https://github.com/ComplianceAsCode/content/issues/8709](https://github.com/ComplianceAsCode/content/issues/8709)
 
-**Status:** Phase I, In Progress
+**Status:** Phase III, Merged
 
 ---
 
@@ -308,9 +308,10 @@ Cloned the repository and located all six candidate files referenced in the main
 **PR Description:** Remove DoD-specific verbiage from rule.yml files#14834
 
 **Maintainer Feedback:**
-- [Pending]
 
-**Status:** Open. Awaiting maintainer review and CI workflow approval.
+   - Merged. Reviewer comment: "Thanks for the PR and keeping the changes easily reviewable."
+  
+**Status:** Merged into ComplianceAsCode/content master.
 
 ---
 
