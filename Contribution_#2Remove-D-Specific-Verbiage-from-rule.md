@@ -12,7 +12,7 @@
 
 ## Why I Chose This Issue
 
-After contribution #1 closed, I wanted a second issue in which the design direction had already been validated by a maintainer, rather than one I'd have to resolve myself mid-PR. Issue #8709 fit that: it carries the "good first issue" label, a prior contributor opened a PR (#13622) covering part of this list which the maintainer confirmed on October 9, 2025 matched the intended direction, and that same comment included a fresh grep of all remaining DoD-specific text across the codebase, showing 119 occurrences across 37 files and explicitly inviting further triage. That gave me a concrete, maintainer-approved worklist to draw from instead of an open question, which was the gap that caused #1 to stall.
+I wanted a second issue in which the design direction had already been validated by a maintainer, rather than one I'd have to resolve myself mid-PR. Issue #8709 fits that: it carries the "good first issue" label, a prior contributor opened a PR (#13622) covering part of this list which the maintainer confirmed on October 9, 2025, matched the intended direction, and that same comment included a fresh grep of all remaining DoD-specific text across the codebase, showing 119 occurrences across 37 files and explicitly inviting further triage. That gave me a concrete, maintainer-approved worklist to draw from instead of an open question, which was the gap that caused #1 to stall.
 
 ---
 
@@ -59,7 +59,7 @@ Repository cloned locally (`ComplianceAsCode/content`, `master` branch) inside t
    find . -iname "mcafee_security_software" -type d
    ```
    This confirmed the maintainer's grep paths matched the local clone exactly.
-3. Read the full content of each file rather than relying on the few lines of context shown in the issue's grep output, to see the complete surrounding `rationale`/`vuldiscussion`/`warnings` block before editing.
+3. Read the full content of each file rather than relying on the few lines of context shown in the issue's grep output to see the complete surrounding `rationale`/`vuldiscussion`/`warnings` block before editing.
 4. Triaged each occurrence into three categories based on whether the DoD reference was incidental prose, a value that should become an XCCDF variable, or a DoD-only requirement with no generic equivalent.
 5. Confirmed the exact file and line number of each DoD reference in the five in-scope files:
    ```bash
@@ -89,7 +89,7 @@ The screenshot above shows the exact file and line number for each DoD-specific 
 
 The issue's primary mechanism is replacing hardcoded policy-specific values with their corresponding XCCDF variable identifiers. For example, replacing the literal `15` in "The DoD requirement is 15" with `{{{ xccdf_value("var_accounts_password_minlen_login_defs") }}}`. That pattern applies to files where a DoD-specific numeric or string value is hardcoded in prose but already has an XCCDF variable defined for it.
 
-The five files in this PR do not follow that pattern. None of them contain a hardcoded value that should be expressed as a variable; they contain organizational prose (descriptions of audit event categories, a named government form, a named product and contact URL) that happens to reference DoD as an organization. For these files, the correct fix per `ggbecker`'s guidance is deletion or rewording to make the language policy-agnostic, not variable substitution. This is consistent with `ggbecker`'s October 9, 2025 confirmation that `yungcero`'s approach ("definitely the intended changes") covered exactly this kind of prose generalization.
+The five files in this PR do not follow that pattern. None of them contain a hardcoded value that should be expressed as a variable; they contain organizational prose (descriptions of audit event categories, a named government form, a named product, and a contact URL) that happens to reference DoD as an organization. For these files, the correct fix per `ggbecker`'s guidance is deletion or rewording to make the language policy-agnostic, not variable substitution. This is consistent with `ggbecker`'s October 9, 2025 confirmation that `yungcero`'s approach ("definitely the intended changes") covered exactly this kind of prose generalization.
 
 ### Proposed Solution
 
@@ -186,7 +186,7 @@ Each of the three checkboxes in Testing Strategy should only be marked complete 
 
 Running plain `yamllint` against the three audit rule files initially produced a `syntax error: could not find expected ':'`. Investigation traced this to a top-level Jinja macro call (`{{{ ocil_fix_srg_privileged_command(...) }}}`) that plain YAML misreads as the start of a flow-mapping. This was confirmed to be **pre-existing and unrelated to this PR** by parsing the original, unedited file directly: the same error occurs at the same line before any DoD-wording edit is applied.
 
-The project's own CI (`.github/workflows/ci_lint.yml`) already accounts for this: any file containing Jinja constructs is piped through `utils/strip_jinja_for_yamllint.py` before linting, rather than linted directly. Reproducing that exact CI logic locally:
+The project's own CI (`.github/workflows/ci_lint.yml`) already accounts for this: any file containing Jinja constructs is piped through `utils/strip_jinja_for_yamllint.py` before linting, rather than being linted directly. Reproducing that exact CI logic locally:
 
 ```bash
 for file in \
@@ -205,7 +205,7 @@ do
 done
 ```
 
-confirmed all five files lint clean under the project's actual CI logic, aside from the one trailing-whitespace error fixed in Step 3 above and one pre-existing `empty-lines` warning in `install_hids/rule.yml` (warning only, does not fail CI, left untouched as out of scope).
+Confirmed all five files lint clean under the project's actual CI logic, aside from the one trailing-whitespace error fixed in Step 3 above and one pre-existing `empty-lines` warning in `install_hids/rule.yml` (warning only, does not fail CI, left untouched as out of scope).
 
 ### Implementation Plan
 
@@ -227,7 +227,7 @@ Using UMPIRE framework (adapted):
 
 **Review:** Confirm field order in each modified `rule.yml` is unchanged (no fields added, removed, or reordered; edits are prose-only within existing `vuldiscussion`/`rationale`/`warnings` blocks), and confirm none of the edited text shifts the underlying technical meaning of the requirement.
 
-**Evaluate:** Re-read each modified file end-to-end after editing to confirm the surrounding paragraph still reads naturally, and the security intent is unchanged.
+**Evaluate:** Re-read each modified file end-to-end after editing to confirm the surrounding paragraph still reads naturally and the security intent is unchanged.
 
 ---
 
@@ -239,7 +239,7 @@ No new Automatus test scenarios are required, since this PR makes no changes to 
 
 ### Integration Tests
 
-**Verification Status Note:** An earlier lint and build pass was recorded against this repo, but a subsequent re-clone (done to re-confirm the original bug state) reset all file edits, including the trio's wording fix. The lint/build passes that were recorded did not actually prove the wording fix, since neither check inspects prose content; they only validate YAML syntax and build mechanics, which pass whether or not the DoD wording is present. All three boxes below are reset to unchecked until re-confirmed against the actual edited content in one pass.
+**Verification Status Note:** An earlier lint and build pass was recorded for this repo, but a subsequent re-clone (to reconfirm the original bug state) reset all file edits, including the trio's wording fix. The lint/build passes recorded did not actually prove the wording fix, since neither check inspects prose content; they only validate YAML syntax and build mechanics, which pass regardless of whether the DoD wording is present. All three boxes below are reset to unchecked until reconfirmed against the actual edited content in a single pass.
 
 - [x] No DoD references remain in the five modified files
   ```bash
@@ -338,5 +338,4 @@ Pull the full file content before triaging matches into "easy/medium/hard" bucke
 - [ComplianceAsCode/content issue #8709](https://github.com/ComplianceAsCode/content/issues/8709)
 - [ComplianceAsCode/content PR #13622 (prior PR covering part of this issue; maintainer confirmed direction, merge status not independently verified)](https://github.com/ComplianceAsCode/content/pull/13622)
 - [ComplianceAsCode Style Guide](https://complianceascode.readthedocs.io/en/latest/manual/developer/04_style_guide.html)
-- [ComplianceAsCode Contributing Guidelines (CONTRIBUTING.md)](https://github.com/ComplianceAsCode/content/blob/master/CONTRIBUTING.md)
-- [ComplianceAsCode Developer Guide](https://complianceascode.readthedocs.io/)
+- [ComplianceAsCode Contributing Guidelines (CONTRIBUTING.md)](https://github.com/ComplianceAsCode/content/blob/master/CONTRIBUTING.mthe edit might cause iter Guide](https://complianceascode.readthedocs.io/)
