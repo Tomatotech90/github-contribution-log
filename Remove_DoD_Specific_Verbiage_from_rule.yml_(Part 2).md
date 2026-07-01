@@ -66,7 +66,7 @@ find . -type f \( \
   -path "*/sssd_certificate_verification/policy/stig/shared.yml" -o \
   -path "*/set_firewalld_default_zone/policy/stig/shared.yml" -o \
   -path "*/ensure_gpgcheck_repo_metadata/rule.yml" -o \
-  -path "*/harden_sshd_macs_opensshserver_conf_crypto_policy/policy/stig/shared.yml" -o I am running a few minutes late; my previous meeting is running over.
+  -path "*/harden_sshd_macs_opensshserver_conf_crypto_policy/policy/stig/shared.yml" -o \
   -path "*/configure_gnutls_tls_crypto_policy/rule.yml" -o \
   -path "*/var_smartcard_drivers.var" -o \
   -path "*/smartcard_auth/rule.yml" -o \
@@ -143,7 +143,7 @@ linux_os/guide/system/accounts/accounts-banners/banner_etc_issue_net/rule.yml
 
 ### Analysis
 
-Each of the 15 files in this PR contains DoD-specific phrasing in a prose field (`rationale`, `vuldiscussion`, `description`, `title`, `fixtext`, `ocil`) that applies to any organization. None of them contain a hardcoded value that should be expressed as an XCCDF variable. The correct fix for all 15 is the removal or rewording of the DoD-specific text, the same approach the maintainer confirmed in PR #13622 and PR #14834.
+Each of the 15 files in this PR contains DoD-specific phrasing in a prose field (`rationale`, `vuldiscussion`, `description`, `title`, `fixtext`, `ocil`) that applies to any organization. None of them contains a hardcoded value that should be expressed as an XCCDF variable. The correct fix for all 15 is the removal or rewording of the DoD-specific text, the same approach the maintainer confirmed in PR #13622 and PR #14834.
 
 ### Fix Approach
 
@@ -438,6 +438,8 @@ Build completed cleanly with all 15 edited files in place.
 
 **PR Link:** [https://github.com/ComplianceAsCode/content/pull/14841](https://github.com/ComplianceAsCode/content/pull/14841)
 
+**Contribution Log:** [https://github.com/Tomatotech90/github-contribution-log/blob/main/Remove_DoD_Specific_Verbiage_from_rule.yml_(Part%202).md](https://github.com/Tomatotech90/github-contribution-log/blob/main/Remove_DoD_Specific_Verbiage_from_rule.yml_(Part%202).md)
+
 **Maintainer Feedback:** Pending
 
 **Status:** Open, awaiting review and CI workflow approval.
@@ -446,7 +448,7 @@ Build completed cleanly with all 15 edited files in place.
 
 ## Notes: 17 Files Excluded from This PR
 
-After reviewing all 32 remaining files from the maintainer's grep list, 17 were excluded from this PR because the DoD reference in each one is not incidental wording around a generic requirement. Instead it is either the verbatim text that a compliance check verifies against, a named DoD infrastructure or network requirement, or a DoD-specific PKI requirement with no clear generic equivalent. Editing these without maintainer guidance would risk changing what the rule actually checks for or misrepresenting its purpose.
+After reviewing all 32 remaining files from the maintainer's grep list, 17 were excluded from this PR because the DoD reference in each one is not incidental wording around a generic requirement. Instead, it is either the verbatim text that a compliance check verifies against, a named DoD infrastructure or network requirement, or a DoD-specific PKI requirement with no clear generic equivalent. Editing these without maintainer guidance would risk changing what the rule actually checks for or misrepresenting its purpose.
 
 These 17 files fall into three groups. Questions for each group are included in the PR description.
 
@@ -462,7 +464,7 @@ linux_os/guide/system/accounts/accounts-banners/remote_login_banner_text.var
 linux_os/guide/services/http/securing_httpd/httpd_secure_content/var_web_login_banner_text.var
 ```
 
-These files contain the Standard Mandatory DoD Notice and Consent Banner as verbatim text. The `.var` files use option keys named `dod_banners` and `dod_default` which DoD STIG profiles select by name. The `rule.yml` files reference those option keys in their checks. Renaming the keys or removing the banner text would break profile selections and change what is actually verified. Maintainer guidance is needed before touching any of these.
+These files contain the Standard Mandatory DoD Notice and Consent Banner as verbatim text. The `.var` files use option keys named `dod_banners` and `dod_default,`, which DoD STIG profiles select by name. The `rule.yml` files reference those option keys in their checks. Renaming the keys or removing the banner text would break profile selections and change what is actually verified. Maintainer guidance is needed before touching any of these.
 
 ### Group 2: PKI and Certificate Files (5 files)
 
@@ -494,7 +496,7 @@ linux_os/guide/system/software/integrity/endpoint_security_software/mcafee_secur
 
 ### Technical Skills Gained
 
-Reading files in full before triaging them was essential here. Several files that appeared easy based on the two-line grep snippet turned out to contain DoD references that were load-bearing once the full file context was visible. The banner `.var` files in particular look like simple string replacements from the grep output but actually define option keys that STIG profiles reference by name, so changing the key names would silently break profile selections.
+Reading files in full before triaging them was essential here. Several files that appeared easy based on the two-line grep snippet turned out to contain DoD references that were load-bearing once the full file context was visible. The banner `.var` files, in particular, look like simple string replacements in the grep output. Still, they actually define option keys that STIG profiles reference by name, so changing the key names would silently break profile selections.
 
 ### What Would Be Done Differently
 
