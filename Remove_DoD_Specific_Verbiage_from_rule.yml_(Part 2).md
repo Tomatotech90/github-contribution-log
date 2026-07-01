@@ -14,6 +14,38 @@
 
 ---
 
+## Update: Maintainer Feedback and Revert
+
+Mab879 reviewed this PR and asked for two changes.
+
+First, 8 of the 15 files are STIG-specific or mirror upstream STIG content, so the DoD wording should remain rather than be reworded. These were reverted to the original text:
+
+- `ssh_use_approved_macs_ordered_stig/rule.yml`
+- `set_firewalld_default_zone/policy/stig/shared.yml`
+- `harden_sshd_macs_opensshserver_conf_crypto_policy/policy/stig/shared.yml`
+- `set_password_hashing_algorithm_systemauth/policy/stig/shared.yml`
+- `set_password_hashing_algorithm_systemauth/policy/stig/rhel10.yml`
+- `accounts_password_pam_minlen/policy/stig/shared.yml`
+- `sssd_certificate_verification/policy/stig/shared.yml`
+- `var_smartcard_drivers.var`
+
+Each file's original text was pulled directly from git history rather than reconstructed and confirmed with a diff against upstream after reverting.
+
+Second, 4 banner files needed a stronger edit. Rewording the lead-in sentence ("The DoD required text is either:") was not enough, since the actual DoD banner text was still there. For 3 of these, the required-text block was removed entirely from the description field:
+
+- `banner_etc_issue_net/rule.yml`
+- `banner_etc_motd/rule.yml`
+- `banner_etc_gdm_banner/rule.yml`
+
+The 4th, `banner_etc_profiled_ssh_confirm/rule.yml`, was left unchanged. Its required text is embedded in a shell script's `read -p` prompt rather than a standalone block, so removing it isn't as simple as deleting a paragraph. A question was posted to the maintainer asking whether to remove the whole script or just the wording inside it, and this file is on hold until that's answered.
+
+All changes were verified with grep, the project's CI-equivalent yamllint check, and a full build (`./build_product rhel9 --datastream`), all the same as in the original submission.
+
+## Original Submission
+
+
+---
+
 ## Why This Contribution
 
 Contribution #2 (PR #14834) addressed 5 files from the grep list for issue #8709 as a first pass. After that PR was merged, the remaining 32 files were reviewed in full to determine which ones could be safely generalized and which ones needed maintainer input first. This PR addresses 15 of those 32 files. The remaining 17 are documented at the end of this README with an explanation of why each group needs clarification before being touched.
