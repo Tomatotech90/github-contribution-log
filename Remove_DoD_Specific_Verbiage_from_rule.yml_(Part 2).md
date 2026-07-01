@@ -10,7 +10,7 @@
 
 **This PR:** [https://github.com/ComplianceAsCode/content/pull/14841](https://github.com/ComplianceAsCode/content/pull/14841)
 
-**Status:** Phase III, In Progress, Open, awaiting review
+**Status:** Phase IV, In Progress, Open, awaiting review
 
 ---
 
