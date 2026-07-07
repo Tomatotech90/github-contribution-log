@@ -10,7 +10,7 @@
 
 **This PR:** [https://github.com/ComplianceAsCode/content/pull/14841](https://github.com/ComplianceAsCode/content/pull/14841)
 
-**Status:** Phase IV, In Progress, Open, awaiting review
+**Status:** Phase IV, In Progress, Open, first round of maintainer feedback received and addressed (commit `5f56e413f1`), awaiting further review
 
 ---
 
@@ -31,7 +31,7 @@ First, 8 of the 15 files are STIG-specific or mirror upstream STIG content, so t
 
 Each file's original text was pulled directly from git history rather than reconstructed and confirmed with a diff against upstream after reverting.
 
-Second, 4 banner files needed a stronger edit. Rewording the lead-in sentence ("The DoD required text is either:") was not enough, since the actual DoD banner text was still there. For 3 of these, the required-text block was removed entirely from the description field:
+Second, 4 banner files needed a stronger edit. Rewording the lead-in sentence ("The DoD required text is either:") was not enough, as the actual DoD banner text remained. For 3 of these, the required-text block was removed entirely from the description field:
 
 - `banner_etc_issue_net/rule.yml`
 - `banner_etc_motd/rule.yml`
@@ -39,7 +39,34 @@ Second, 4 banner files needed a stronger edit. Rewording the lead-in sentence ("
 
 The 4th, `banner_etc_profiled_ssh_confirm/rule.yml`, was left unchanged. Its required text is embedded in a shell script's `read -p` prompt rather than a standalone block, so removing it isn't as simple as deleting a paragraph. A question was posted to the maintainer asking whether to remove the whole script or just the wording inside it, and this file is on hold until that's answered.
 
-All changes were verified with grep, the project's CI-equivalent yamllint check, and a full build (`./build_product rhel9 --datastream`), all the same as in the original submission.
+All changes were verified with grep, the project's CI-equivalent yamllint check, and a full build (`./build_product rhel9 --datastream`), all of which were the same as in the original submission.
+
+## Testing
+
+<!-- FEEDBACK: Phase III - Testing -->
+
+No new automated test file was added for this contribution. All 15 files in scope and the 11 files touched in this revision are prose-only edits to `description`, `rationale`, `vuldiscussion`, or similar text fields. None of the changes touch OVAL checks, remediation scripts (bash/ansible), or rule logic, so no existing behavior being tested actually changed.
+
+Existing tests for all affected rules were not modified and are expected to pass as is, since none of them assert on the edited prose fields. This was confirmed indirectly through the full product build below, which would fail if any structural or logic issue were introduced.
+
+**What was tested and how:**
+
+1. **grep verification** — confirmed target DoD text was removed (or restored, for the 8 reverted files) in each affected file. See "Before State Confirmation" and the revert verification in the Update section above.
+2. **Lint verification** — ran the project's CI-equivalent yamllint check (piping Jinja-templated files through `utils/strip_jinja_for_yamllint.py`) against all 11 changed files. Only pre-existing warnings were found; no new errors. One pre-existing error (`var_smartcard_drivers.var`, trailing spaces) was confirmed to already exist in `upstream/master` and is unrelated to this contribution.
+3. **Build verification** — ran `./build_product rhel9 --datastream` after all edits, completed cleanly (`[13/13] Updating data stream ssg-rhel9-ds.xml to 1.3`).
+4. **Diff verification against upstream** — for the 8 reverted files, ran a direct `diff` against `upstream/master` (or the file's actual parent commit, where master had since drifted) and confirmed a byte-for-byte match with zero remaining differences.
+
+No manual testing beyond the above was performed, since these are documentation-only fields with no runtime behavior to exercise manually.
+
+## Acceptance Criteria
+
+<!-- FEEDBACK: Phase IV - Acceptance criteria checklist -->
+
+- [x] Follows the project's style guide for prose edits (no field reordering, no logic changes)
+- [x] No breaking changes to OVAL checks, remediations, or rule structure
+- [x] Existing tests unaffected (see Testing section above)
+- [ ] New automated test added — not applicable, see Testing section for rationale
+- [ ] All maintainer feedback addressed — in progress, one open question pending response (`banner_etc_profiled_ssh_confirm` / `var_ssh_confirm_text`)
 
 ## Original Submission
 
@@ -179,7 +206,7 @@ Each of the 15 files in this PR contains DoD-specific phrasing in a prose field 
 
 ### Fix Approach
 
-All edits were applied in a single Python script using exact string matching to avoid any risk of regex-related whitespace or indentation errors. For each file, the script confirmed the target text existed before writing the change, and reported clearly if any match was not found.
+All edits were applied in a single Python script using exact string matching to avoid any risk of regex-related whitespace or indentation errors. For each file, the script confirmed that the target text existed before writing the change and clearly reported if no match was found.
 
 The full before and after for each file:
 
@@ -472,9 +499,16 @@ Build completed cleanly with all 15 edited files in place.
 
 **Contribution Log:** [https://github.com/Tomatotech90/github-contribution-log/blob/main/Remove_DoD_Specific_Verbiage_from_rule.yml_(Part%202).md](https://github.com/Tomatotech90/github-contribution-log/blob/main/Remove_DoD_Specific_Verbiage_from_rule.yml_(Part%202).md)
 
-**Maintainer Feedback:** Pending
+<!-- FEEDBACK: Phase IV - Maintainer Feedback log -->
 
-**Status:** Open, awaiting review and CI workflow approval.
+**Maintainer Feedback:**
+
+- Mab879 reviewed the original 15-file submission and requested two changes: (1) revert 8 STIG-specific/upstream-mirrored files back to original DoD wording, since these files mirror upstream STIG content, and (2) for 4 banner files, remove the required banner text entirely from the `description` field rather than just rewording the lead-in sentence.
+- Response (commit `5f56e413f1`): reverted the 8 files to their original upstream text, confirmed with a direct diff against `upstream/master` for each. Removed the required-text block entirely from 3 of the 4 banner files (`banner_etc_issue_net`, `banner_etc_motd`, `banner_etc_gdm_banner`). Left the 4th (`banner_etc_profiled_ssh_confirm/rule.yml`) unchanged, since its DoD text is embedded inside a shell script's `read -p` prompt rather than a standalone block, and posted a follow-up question asking whether to remove the script or only the wording.
+- Mab879 suggested using an XCCDF variable (`var_ssh_confirm_text`) in place of the hardcoded DoD text in `banner_etc_profiled_ssh_confirm/rule.yml`.
+- Investigated and confirmed `var_ssh_confirm_text.var` already exists and is already wired into the fix script (`bash/shared.sh`) and the OVAL check (`oval/shared.xml`) via `external_variable`. Confirmed the variable currently has only one option (`dod_default`) with no generic alternative. Posted a follow-up comment scoping the actual fix to two files (`var_ssh_confirm_text.var`, adding a generic option, and `rule.yml`'s stale description). Awaiting maintainer confirmation before implementing.
+
+**Status:** Open, first round of feedback addressed, second round (the `var_ssh_confirm_text` variable approach) proposed and awaiting maintainer response.
 
 ---
 
@@ -529,6 +563,14 @@ linux_os/guide/system/software/integrity/endpoint_security_software/mcafee_secur
 ### Technical Skills Gained
 
 Reading files in full before triaging them was essential here. Several files that appeared easy based on the two-line grep snippet turned out to contain DoD references that were load-bearing once the full file context was visible. The banner `.var` files, in particular, look like simple string replacements in the grep output. Still, they actually define option keys that STIG profiles reference by name, so changing the key names would silently break profile selections.
+
+<!-- FEEDBACK: Phase IV - Challenges Overcome -->
+
+### Challenges Overcome
+
+The biggest challenge in this round was reverting 8 files accurately without guessing at the original wording. The contribution log only had a written summary of the "before" text, not confirmed formatting or whitespace, so reconstructing it by hand risked introducing a subtly wrong revert. Pulling the actual original text directly from git history (`git show upstream/master:<path>`) and diffing the result against the same source afterward solved this, since it removed any need to trust a written summary over the actual repository history. One file (`set_password_hashing_algorithm_systemauth/policy/stig/rhel10.yml`) initially produced a diff full of unrelated content; tracing this back showed `upstream/master` had moved ahead of the PR's branch point for unrelated reasons (a separate yescrypt/sha512 rewrite), so the correct comparison had to be made against that file's actual parent commit instead of the current master.
+
+A second challenge was the `banner_etc_profiled_ssh_confirm/rule.yml` file, where the maintainer's suggestion to use an XCCDF variable initially seemed to mean creating a new variable from scratch. Checking the actual fix script, OVAL check, and existing `.var` file directly (rather than assuming) revealed the variable already existed and was already correctly wired in, and the real gap was a missing generic option, a much smaller and more precise fix than first assumed.
 
 ### What Would Be Done Differently
 
