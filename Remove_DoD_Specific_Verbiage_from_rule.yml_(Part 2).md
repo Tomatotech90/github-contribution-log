@@ -1,4 +1,4 @@
-# Contribution #3: Remove DoD Specific Verbiage from rule.yml Files (Part 2)
+# Contribution #3: Remove DoD Specific Verbiage from rule.yml Files (Part 2) update
 
 **Contribution Number:** 3
 
