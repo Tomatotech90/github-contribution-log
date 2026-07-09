@@ -10,7 +10,7 @@
 
 **This PR:** [https://github.com/ComplianceAsCode/content/pull/14841](https://github.com/ComplianceAsCode/content/pull/14841)
 
-**Status:** Phase IV, In Progress, Open, first round of maintainer feedback received and addressed (commit `5f56e413f1`), awaiting further review
+**Status:** Phase IV, In Progress, the feedback received and addressed (commit `5f56e413f1`), awaiting review
 
 ---
 
