@@ -16,7 +16,7 @@
 
 ## Update: Maintainer Feedback and Revert
 
-Mab879 reviewed this PR and asked for two changes.
+Two changes were requested after review.
 
 First, 8 of the 15 files are STIG-specific or mirror upstream STIG content, so the DoD wording should remain rather than be reworded. These were reverted to the original text:
 
@@ -39,7 +39,19 @@ Second, 4 banner files needed a stronger edit. Rewording the lead-in sentence ("
 
 The 4th, `banner_etc_profiled_ssh_confirm/rule.yml`, was left unchanged. Its required text is embedded in a shell script's `read -p` prompt rather than a standalone block, so removing it isn't as simple as deleting a paragraph. A question was posted to the maintainer asking whether to remove the whole script or just the wording inside it, and this file is on hold until that's answered.
 
-All changes were verified with grep, the project's CI-equivalent yamllint check, and a full build (`./build_product rhel9 --datastream`), all of which were the same as in the original submission.
+All changes were verified with grep, the project's CI-equivalent yamllint check, and a full build (`./build_product rhel9 --datastream`), all of which matched the original submission.
+
+## Update: var_ssh_confirm_text Generic Option
+
+Follow-up feedback suggested using the existing `var_ssh_confirm_text` variable instead of hardcoded text in `banner_etc_profiled_ssh_confirm/rule.yml`.
+
+The variable already existed and was already used correctly in the fix script and the OVAL check. It only had one option, `dod_default`, with no generic alternative.
+
+Added a second option, `generic_default`, to `var_ssh_confirm_text.var`. Generated the regex for the new banner text with the project's own tool, `utils/regexify_banner.py`, the same tool used for `dod_default`. Updated `rule.yml`'s description field to explain that the text is configurable through the variable instead of showing the DoD text directly.
+
+Confirmed the new option resolves correctly by running it through the same regexify steps the build uses. The result was clean, valid banner text. Also confirmed with yamllint and a full product build.
+
+An existing STIG control file explicitly pins `var_ssh_confirm_text` to `dod_default`, so this change does not affect that profile.
 
 ## Testing
 
@@ -51,10 +63,10 @@ Existing tests for all affected rules were not modified and are expected to pass
 
 **What was tested and how:**
 
-1. **grep verification** — confirmed target DoD text was removed (or restored, for the 8 reverted files) in each affected file. See "Before State Confirmation" and the revert verification in the Update section above.
-2. **Lint verification** — ran the project's CI-equivalent yamllint check (piping Jinja-templated files through `utils/strip_jinja_for_yamllint.py`) against all 11 changed files. Only pre-existing warnings were found; no new errors. One pre-existing error (`var_smartcard_drivers.var`, trailing spaces) was confirmed to already exist in `upstream/master` and is unrelated to this contribution.
-3. **Build verification** — ran `./build_product rhel9 --datastream` after all edits, completed cleanly (`[13/13] Updating data stream ssg-rhel9-ds.xml to 1.3`).
-4. **Diff verification against upstream** — for the 8 reverted files, ran a direct `diff` against `upstream/master` (or the file's actual parent commit, where master had since drifted) and confirmed a byte-for-byte match with zero remaining differences.
+1. **grep verification**: confirmed target DoD text was removed (or restored, for the 8 reverted files) in each affected file. See "Before State Confirmation" and the revert verification in the Update section above.
+2. **Lint verification**: ran the project's CI-equivalent yamllint check (piping Jinja-templated files through `utils/strip_jinja_for_yamllint.py`) against all 11 changed files. Only pre-existing warnings were found; no new errors. One pre-existing error (`var_smartcard_drivers.var`, trailing spaces) was confirmed to already exist in `upstream/master` and is unrelated to this contribution.
+3. **Build verification**: ran `./build_product rhel9 --datastream` after all edits, completed cleanly (`[13/13] Updating data stream ssg-rhel9-ds.xml to 1.3`).
+4. **Diff verification against upstream**: for the 8 reverted files, ran a direct `diff` against `upstream/master` (or the file's actual parent commit, where master had since drifted) and confirmed a byte-for-byte match with zero remaining differences.
 
 No manual testing beyond the above was performed, since these are documentation-only fields with no runtime behavior to exercise manually.
 
@@ -65,8 +77,8 @@ No manual testing beyond the above was performed, since these are documentation-
 - [x] Follows the project's style guide for prose edits (no field reordering, no logic changes)
 - [x] No breaking changes to OVAL checks, remediations, or rule structure
 - [x] Existing tests unaffected (see Testing section above)
-- [ ] New automated test added — not applicable, see Testing section for rationale
-- [ ] All maintainer feedback addressed — in progress, one open question pending response (`banner_etc_profiled_ssh_confirm` / `var_ssh_confirm_text`)
+- [ ] New automated test added: not applicable, see Testing section for rationale
+- [x] All maintainer feedback addressed: `banner_etc_profiled_ssh_confirm` now uses the `var_ssh_confirm_text` generic option, see Update section above
 
 ## Original Submission
 
@@ -206,7 +218,7 @@ Each of the 15 files in this PR contains DoD-specific phrasing in a prose field 
 
 ### Fix Approach
 
-All edits were applied in a single Python script using exact string matching to avoid any risk of regex-related whitespace or indentation errors. For each file, the script confirmed that the target text existed before writing the change and clearly reported if no match was found.
+All edits were applied in a single Python script using exact string matching to avoid any risk of regex-related whitespace or indentation errors. For each file, the script confirmed that the target text existed before writing the change and clearly reported a no match if none was found.
 
 The full before and after for each file:
 
@@ -503,12 +515,13 @@ Build completed cleanly with all 15 edited files in place.
 
 **Maintainer Feedback:**
 
-- Mab879 reviewed the original 15-file submission and requested two changes: (1) revert 8 STIG-specific/upstream-mirrored files back to original DoD wording, since these files mirror upstream STIG content, and (2) for 4 banner files, remove the required banner text entirely from the `description` field rather than just rewording the lead-in sentence.
-- Response (commit `5f56e413f1`): reverted the 8 files to their original upstream text, confirmed with a direct diff against `upstream/master` for each. Removed the required-text block entirely from 3 of the 4 banner files (`banner_etc_issue_net`, `banner_etc_motd`, `banner_etc_gdm_banner`). Left the 4th (`banner_etc_profiled_ssh_confirm/rule.yml`) unchanged, since its DoD text is embedded inside a shell script's `read -p` prompt rather than a standalone block, and posted a follow-up question asking whether to remove the script or only the wording.
-- Mab879 suggested using an XCCDF variable (`var_ssh_confirm_text`) in place of the hardcoded DoD text in `banner_etc_profiled_ssh_confirm/rule.yml`.
-- Investigated and confirmed `var_ssh_confirm_text.var` already exists and is already wired into the fix script (`bash/shared.sh`) and the OVAL check (`oval/shared.xml`) via `external_variable`. Confirmed the variable currently has only one option (`dod_default`) with no generic alternative. Posted a follow-up comment scoping the actual fix to two files (`var_ssh_confirm_text.var`, adding a generic option, and `rule.yml`'s stale description). Awaiting maintainer confirmation before implementing.
+- First round of feedback: revert 8 STIG-specific/upstream-mirrored files back to original DoD wording, since these files mirror upstream STIG content. For 4 banner files, remove the required banner text entirely from the `description` field rather than just rewording the lead-in sentence.
+- Response (commit `5f56e413f1`): reverted the 8 files to their original upstream text, confirmed with a direct diff against `upstream/master` for each. Removed the required-text block entirely from 3 of the 4 banner files (`banner_etc_issue_net`, `banner_etc_motd`, `banner_etc_gdm_banner`). Left the 4th (`banner_etc_profiled_ssh_confirm/rule.yml`) unchanged, since its DoD text is embedded inside a shell script's `read -p` prompt rather than a standalone block. Posted a follow-up question asking whether to remove the script or only the wording.
+- Second round of feedback: use an XCCDF variable (`var_ssh_confirm_text`) in place of the hardcoded DoD text in `banner_etc_profiled_ssh_confirm/rule.yml`.
+- Investigated and confirmed `var_ssh_confirm_text.var` already exists and is already wired into the fix script (`bash/shared.sh`) and the OVAL check (`oval/shared.xml`) via `external_variable`. The variable had only one option (`dod_default`) with no generic alternative. Confirmation received that adding another option would be fine.
+- Response: added a new option, `generic_default`, to `var_ssh_confirm_text.var`, generated with the project's own `utils/regexify_banner.py` tool. Updated `rule.yml`'s description field to reference the variable instead of showing the DoD text directly. Confirmed the new option resolves correctly through the same deregexify steps used at build time, and confirmed with yamllint and a full product build. See the Update section above for details.
 
-**Status:** Open, first round of feedback addressed, second round (the `var_ssh_confirm_text` variable approach) proposed and awaiting maintainer response.
+**Status:** Open; first round of feedback addressed; second round (`var_ssh_confirm_text` generic option) implemented and verified ---- awaiting maintainer review.
 
 ---
 
@@ -568,9 +581,9 @@ Reading files in full before triaging them was essential here. Several files tha
 
 ### Challenges Overcome
 
-The biggest challenge in this round was reverting 8 files accurately without guessing at the original wording. The contribution log only had a written summary of the "before" text, not confirmed formatting or whitespace, so reconstructing it by hand risked introducing a subtly wrong revert. Pulling the actual original text directly from git history (`git show upstream/master:<path>`) and diffing the result against the same source afterward solved this, since it removed any need to trust a written summary over the actual repository history. One file (`set_password_hashing_algorithm_systemauth/policy/stig/rhel10.yml`) initially produced a diff full of unrelated content; tracing this back showed `upstream/master` had moved ahead of the PR's branch point for unrelated reasons (a separate yescrypt/sha512 rewrite), so the correct comparison had to be made against that file's actual parent commit instead of the current master.
+Reverting 8 files accurately required not guessing at the original wording. The contribution log only had a written summary of the "before" text, not confirmed formatting or whitespace, so reconstructing it by hand risked introducing a subtly wrong revert. Pulling the actual original text directly from git history (`git show upstream/master:<path>`) and diffing the result against the same source afterward solved this, since it removed any need to trust a written summary over the actual repository history. One file (`set_password_hashing_algorithm_systemauth/policy/stig/rhel10.yml`) initially produced a diff full of unrelated content; tracing this back showed `upstream/master` had moved ahead of the PR's branch point for unrelated reasons (a separate yescrypt/sha512 rewrite), so the correct comparison had to be made against that file's actual parent commit instead of the current master.
 
-A second challenge was the `banner_etc_profiled_ssh_confirm/rule.yml` file, where the maintainer's suggestion to use an XCCDF variable initially seemed to mean creating a new variable from scratch. Checking the actual fix script, OVAL check, and existing `.var` file directly (rather than assuming) revealed the variable already existed and was already correctly wired in, and the real gap was a missing generic option, a much smaller and more precise fix than first assumed.
+The `banner_etc_profiled_ssh_confirm/rule.yml` file initially appeared to need a new variable created from scratch, based on the maintainer's suggestion to use an XCCDF variable. Checking the actual fix script, the OVAL check, and the existing `.var` file directly showed that the variable already existed and was correctly wired in. The actual gap was no a  generic option.
 
 ### What Would Be Done Differently
 
