@@ -1,8 +1,11 @@
 # Contribution #3: Remove DoD Specific Verbiage from rule.yml Files (Part 2)
 
 **Contribution Number:** 3
+
 **Student:** Jonathan Morales
+
 **Issue:** [https://github.com/ComplianceAsCode/content/issues/8709](https://github.com/ComplianceAsCode/content/issues/8709)
+
 **Status:** Phase III Complete
 
 ---
