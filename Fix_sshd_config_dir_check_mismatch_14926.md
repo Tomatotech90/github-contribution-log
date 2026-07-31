@@ -1,4 +1,4 @@
-# Contribution: Some ssh rules write remediation to /etc/ssh/sshd_config.d/ but check /etc/ssh/sshd_config
+# Contribution: Some SSH rules write remediation to /etc/ssh/sshd_config.d/, but check /etc/ssh/sshd_config
 
 **Student:** Jonathan Morales
 
@@ -10,7 +10,7 @@
 
 ## Why I Chose This Issue
 
-I picked this issue because it has a clear, reproducible bug report with exact commands and output from the reporter. The rule cannot be removed and there is no ambiguity about what correct behavior should look like, since the remediation itself already understands distributed sshd config and the check simply does not. I also chose it over another candidate issue that was opened by a maintainer but described as possibly just a testing environment problem, since that issue's root cause was not established yet.
+I picked this issue because it has a clear, reproducible bug report with exact commands and output from the reporter. The rule cannot be removed, and there is no ambiguity about what correct behavior should look like, since the remediation itself already understands distributed sshd config and the check simply does not. I also chose it over another candidate issue that was opened by a maintainer but described as possibly just a testing environment problem, since that issue's root cause was not established yet.
 
 ---
 
@@ -18,7 +18,7 @@ I picked this issue because it has a clear, reproducible bug report with exact c
 
 ### Problem Description
 
-Several sshd rules write their remediation to a drop in file under `/etc/ssh/sshd_config.d/` when the product uses a distributed sshd config, but the OVAL check for these rules only reads `/etc/ssh/sshd_config`. After remediation runs successfully, the check still fails because it never looks in the directory where the value was actually written.
+Several sshd rules write their remediation to a drop-in file under `/etc/ssh/sshd_config.d/` when the product uses a distributed sshd config, but the OVAL check for these rules only reads `/etc/ssh/sshd_config`. After remediation runs successfully, the check still fails because it never looks in the directory where the value was actually written.
 
 ### Expected Behavior
 
@@ -38,7 +38,7 @@ The issue names four rules: `sshd_use_approved_ciphers`, `sshd_use_approved_ciph
 
 ### Environment Setup
 
-I reattached to the existing `ssg-dev` docker container rather than creating a new one. The SSH agent does not persist across container restarts, so `git fetch upstream` failed with a publickey error until I ran `eval "$(ssh-agent -s)"` and `ssh-add ~/.ssh/id_ed25519` again. The key itself was already registered on GitHub, confirmed with `ssh -T git@github.com`, so no new key was needed.
+I reattached to the existing `ssg-dev` Docker container rather than creating a new one. The SSH agent does not persist across container restarts, so `git fetch upstream` failed with a public key error until I ran `eval "$(ssh-agent -s)"` and `ssh-add ~/.ssh/id_ed25519` again. The key itself was already registered on GitHub, confirmed with `ssh -T git@github.com`, so no new key was needed.
 
 I built the sle15 datastream with `./build_product sle15 --datastream`, since sle15 is a product that sets `sshd_distributed_config`, matching the SLES 15 SP5 environment in the bug report.
 
@@ -72,7 +72,7 @@ My findings: the object definition confirmed directly from the built datastream 
 
 The check and the remediation for these four rules disagree on where the configuration lives. The remediation macro, `bash_sshd_remediation`, already accepts a `config_is_distributed` parameter and correctly writes to the config directory when set. The OVAL side was never given the same awareness for these four rules specifically.
 
-I found that other rules in the same codebase already solve this correctly. `sshd_rekey_limit` and `sshd_use_strong_ciphers` both call a shared macro, `sshd_oval_check`, which accepts `config_is_distributed` and builds separate check logic for the main file and the config directory.
+I checked whether `sshd_use_approved_ciphers_ordered_stig` and `sshd_use_approved_macs_ordered_stig` already have a platform-specific OVAL file, since their Bash and Ansible remediation both branch on Ubuntu with different approved values. Both rules have an `oval/ubuntu.xml`, and both already contain a correct fix for this exact bug, just scoped to Ubuntu. That file checks the main config file and the config directory as two separate objects, collects both into a set, and tests that the required value exists in at least one of them. `oval/shared.xml`, which covers Oracle Linux 7, SLE, and SLE Micro, including the SLES 15 SP5 environment from the bug report, still has the old single-file check. I confirmed no equivalent `ubuntu.xml` exists for `sshd_use_approved_ciphers` or `sshd_use_approved_macs`, so this precedent only applies to the two ordered_stig rules.
 
 Looking at the actual matching logic used by `sshd_use_approved_ciphers` and `sshd_use_approved_macs`, I found they use a different comparison style than `sshd_use_approved_ciphers_ordered_stig` and `sshd_use_approved_macs_ordered_stig`. The plain variants split the configured value and the approved value list on commas and check that at least one approved value is present, an intersection check against a dynamic external variable. The ordered_stig variants use a single fixed regex, the same style already used successfully by `sshd_use_strong_ciphers`.
 
@@ -82,25 +82,26 @@ The two ordered_stig variants do not have this problem, since their fixed regex 
 
 ### Proposed Solution
 
-For `sshd_use_approved_ciphers_ordered_stig` and `sshd_use_approved_macs_ordered_stig`, replace the hand written OVAL body with a call to the shared `sshd_oval_check` macro, passing the existing fixed regex as the value and `config_is_distributed=sshd_distributed_config`, the same call shape already used by `sshd_use_strong_ciphers`.
+For `sshd_use_approved_ciphers_ordered_stig` and `sshd_use_approved_macs_ordered_stig`, replace the hand written `oval/shared.xml` body with the same structure already shipped and working in each rule's own `oval/ubuntu.xml`, using the fixed values `shared.xml` already uses (`aes256-ctr,aes192-ctr,aes128-ctr` for Ciphers, `hmac-sha2-512,hmac-sha2-256` for MACs).
 
 ### Implementation Plan
 
 Using UMPIRE framework:
 
-**Understand:** The OVAL check for these two rules only reads `/etc/ssh/sshd_config`, while their remediation can write to `/etc/ssh/sshd_config.d/` on distributed config products, so the check fails after remediation succeeds.
+**Understand:** The OVAL check for these two rules only reads `/etc/ssh/sshd_config` in the shared.xml file, while their remediation can write to `/etc/ssh/sshd_config.d/` on distributed config products, so the check fails after remediation succeeds. shared.xml governs Oracle Linux 7, SLE, and SLE Micro, which includes the SLES 15 SP5 environment in the bug report.
 
-**Match:** `sshd_use_strong_ciphers` already solves this exact shape of problem with a fixed regex value, calling `sshd_oval_check` with `config_is_distributed=sshd_distributed_config`.
+**Match:** Each rule already has a working fix in its own `oval/ubuntu.xml`, checking the main file and the config directory as separate objects, collecting both into a set, and testing that the value exists in at least one of them with `check_existence="at_least_one_exists"`. This is not just an analogous rule; it is the same rule already fixed for a different platform.
 
 **Plan:**
-1. Replace the hand written `oval/shared.xml` body in both rules with a call to `sshd_oval_check`, using the existing fixed regex and `config_is_distributed=sshd_distributed_config`.
-2. Confirm `bash/shared.sh` and `ansible/shared.yml` for both rules already pass `config_is_distributed=sshd_distributed_config` to their remediation macros. Already confirmed for the ciphers ordered_stig variant. Still need to confirm the macs ordered_stig variant directly.
-3. Rebuild the sle15 datastream and run the same fake root reproduction method against the real generated OVAL for both rules, to confirm the result changes from false to true.
-4. Check whether existing tests in each rule's `tests/` folder already cover the config directory scenario, since `sshd_use_approved_macs_ordered_stig` already has a test file named `correct_value_config_dir.pass.sh` that appears to expect this scenario to pass.
+1. Replace the `oval/shared.xml` body in both rules with the same object, state, set, and test structure already used in `oval/ubuntu.xml`, substituting the fixed values `shared.xml` already uses instead of the ubuntu product branching.
+2. Confirmed `bash/shared.sh` and `ansible/shared.yml` for both rules already pass `config_is_distributed=sshd_distributed_config` to their remediation macros. Ansible in particular already branches correctly for every platform including ubuntu in a single file, so no ansible change is needed.
+3. Confirmed no `prodtype` restriction exists in either rule.yml, and confirmed `sshd_config_dir` is a real generically available variable through `ssg/products.py`, not something specific to ubuntu.
+4. Rebuild the sle15 datastream and run the same fake root reproduction method against the real generated OVAL for both rules, to confirm the result changes from false to true.
+5. Add a `correct_value_config_dir.pass.sh` test for `sshd_use_approved_ciphers_ordered_stig`, since `sshd_use_approved_macs_ordered_stig` already has this test and the ciphers rule does not, and the two should have equal coverage once both are fixed.
 
 **Implement:** Not started. No branch created yet for this issue.
 
-**Review:** Confirm no other product changes behavior unexpectedly, since `sshd_oval_check` is shared by other already passing rules. Confirm `rule.yml` field order stays unchanged in both rules.
+**Review:** Confirm no other product changes behavior unexpectedly, since ubuntu.xml already proves this structure is safe in production. Confirm `rule.yml` field order stays unchanged in both rules.
 
 **Evaluate:** Rebuild the datastream, extract the OVAL, and run the same `OSCAP_PROBE_ROOT` fake root test method used in reproduction, confirming the result flips from false to true for both rules.
 
@@ -111,6 +112,7 @@ Using UMPIRE framework:
 ### Unit Tests
 
 - [ ] Confirm `sshd_use_approved_macs_ordered_stig/tests/correct_value_config_dir.pass.sh` passes once the fix is applied
+- [ ] Add `correct_value_config_dir.pass.sh` for `sshd_use_approved_ciphers_ordered_stig`, since no equivalent test exists for that rule yet
 - [ ] Confirm existing main file test scenarios for both rules still pass after the fix
 
 ### Integration Tests
@@ -127,7 +129,7 @@ Not yet performed. No code has been written for this issue.
 
 ### Week 1 Progress
 
-Confirmed the root cause directly from the built sle15 datastream rather than assuming it from the issue text. Reproduced the exact failure using a fake root and a standalone OVAL document evaluated with `oscap oval eval`. Found two real working precedents already in the codebase, `sshd_rekey_limit` and `sshd_use_strong_ciphers`, both using the shared `sshd_oval_check` macro. Read the actual macro source for `sshd_oval_check`, `oval_line_in_file_object`, and `oval_line_in_file_state` to confirm none of them support the comma split and intersection logic used by `sshd_use_approved_ciphers` and `sshd_use_approved_macs`. Posted a scoping comment on the issue asking for direction on those two rules before touching shared macro code. No branch created yet, no fix written yet for the two ordered_stig rules covered by this plan.
+Confirmed the root cause directly from the built sle15 datastream rather than assuming it from the issue text. Reproduced the exact failure using a fake root and a standalone OVAL document evaluated with `oscap oval eval`. An early grep for `oval-def:definition` style tags against a split datastream file returned nothing for `sshd_use_strong_ciphers`, which looked like the rule might not exist in the sle15 build. Checking the actual tag prefix used in the built file showed the grep itself was wrong, not the rule's presence, a useful reminder to verify a negative result before treating it as a finding. Read the actual macro source for `sshd_oval_check`, `oval_line_in_file_object`, and `oval_line_in_file_state` to confirm none of them support the comma split and intersection logic used by `sshd_use_approved_ciphers` and `sshd_use_approved_macs`. Later found a stronger precedent than any shared macro, both `sshd_use_approved_ciphers_ordered_stig` and `sshd_use_approved_macs_ordered_stig` already have a working fix in their own `oval/ubuntu.xml`, just not in `oval/shared.xml`. Confirmed no equivalent ubuntu.xml exists for the two plain variants. Verified ansible remediation, rule.yml platform scoping, and the `sshd_config_dir` variable are all already correct or generically available for both ordered_stig rules. Found `sshd_use_approved_ciphers_ordered_stig` has no config directory test while the macs rule does. Posted a scoping comment on the issue asking for direction on the two plain variants before touching shared macro code. No branch created yet, no fix written yet for the two ordered_stig rules covered by this plan.
 
 ### Code Changes
 
@@ -149,7 +151,7 @@ Learned how to isolate a single OVAL object and state pair into a standalone doc
 
 ### Challenges Overcome
 
-An early grep for `oval-def:definition` style tags returned nothing for `sshd_use_strong_ciphers`, which looked like the rule might not exist in the sle15 build at all. Checking the actual tag prefix used in the built datastream showed the grep pattern itself was wrong, not the rule's presence. This was a useful reminder to verify a negative result before treating it as a real finding.
+An early grep for `oval-def:definition` style tags returned nothing for `sshd_use_strong_ciphers`, which looked like the rule might exist in the sle15 build at all. Checking the actual tag prefix used in the built datastream showed the grep pattern itself was wrong, not the rule's presence. This was a useful reminder to verify a negative result before treating it as a real finding.
 
 ### What I'd Do Differently Next Time
 
