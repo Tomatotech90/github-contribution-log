@@ -4,7 +4,7 @@
 
 **Issue:** [https://github.com/ComplianceAsCode/content/issues/14926](https://github.com/ComplianceAsCode/content/issues/14926)
 
-**Status:** Phase II, In Progress. 
+**Status:** Phase II, In Progress.
 
 **Update:** Fix drafted and verified for the two ordered_stig rules, not yet committed or opened as a PR. The two plain variants remain blocked on a maintainer reply to the scoping comment.
 
