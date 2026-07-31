@@ -4,13 +4,15 @@
 
 **Issue:** [https://github.com/ComplianceAsCode/content/issues/14926](https://github.com/ComplianceAsCode/content/issues/14926)
 
-**Status:** Phase II, In Progress. Fix drafted and verified for the two ordered_stig rules, not yet committed or opened as a PR. The two plain variants remain blocked on a maintainer reply to the scoping comment.
+**Status:** Phase II, In Progress. 
+
+**Update:** Fix drafted and verified for the two ordered_stig rules, not yet committed or opened as a PR. The two plain variants remain blocked on a maintainer reply to the scoping comment.
 
 ---
 
 ## Why I Chose This Issue
 
-I picked this issue because it has a clear, reproducible bug report with exact commands and output from the reporter. The rule cannot be removed and there is no ambiguity about what correct behavior should look like, since the remediation itself already understands distributed sshd config and the check simply does not. I also chose it over another candidate issue that was opened by a maintainer but described as possibly just a testing environment problem, since that issue's root cause was not established yet.
+I picked this issue because it has a clear, reproducible bug report with exact commands and output from the reporter. The rule cannot be removed, and there is no ambiguity about what correct behavior should look like, since the remediation itself already understands distributed sshd config and the check simply does not. I also chose it over another candidate issue that was opened by a maintainer but described as possibly just a testing environment problem, since that issue's root cause was not established yet.
 
 ---
 
