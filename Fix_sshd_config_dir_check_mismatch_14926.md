@@ -4,7 +4,7 @@
 
 **Issue:** [https://github.com/ComplianceAsCode/content/issues/14926](https://github.com/ComplianceAsCode/content/issues/14926)
 
-**Status:** Phase II, In Progress
+**Status:** Phase II, In Progress. Fix drafted and verified for the two ordered_stig rules, not yet committed or opened as a PR. The two plain variants remain blocked on a maintainer reply to the scoping comment.
 
 ---
 
@@ -112,12 +112,15 @@ Using UMPIRE framework:
 ### Unit Tests
 
 - [ ] Confirm `sshd_use_approved_macs_ordered_stig/tests/correct_value_config_dir.pass.sh` passes once the fix is applied
-- [ ] Add `correct_value_config_dir.pass.sh` for `sshd_use_approved_ciphers_ordered_stig`, since no equivalent test exists for that rule yet
+- [x] Added `correct_value_config_dir.pass.sh` for `sshd_use_approved_ciphers_ordered_stig`, scoped to `multi_platform_ol,multi_platform_rhel,multi_platform_sle,multi_platform_slmicro,multi_platform_almalinux`, matching the platform scope of this rule's other existing test `correct_reduced_list.pass.sh`, rather than the ubuntu only scope used by the existing MACs config dir test
 - [ ] Confirm existing main file test scenarios for both rules still pass after the fix
 
 ### Integration Tests
 
-- [ ] Rebuild sle15 datastream and re-run the fake root reproduction against the real generated OVAL for both rules, confirming the result is true
+- [x] Rebuilt the sle15 datastream after applying the fix to both rules, with no build errors
+- [x] Extracted the real generated OVAL for both rules from the rebuilt datastream and confirmed it matches the drafted fix exactly, no rendering differences
+- [x] Ran the real generated Ciphers check content, wrapped in a minimal definition skipping package prerequisite checks, against a fake root matching real remediation output. Result: true
+- [x] Ran the real generated MACs check content the same way against a matching fake root. Result: true
 
 ### Manual Testing
 
@@ -131,9 +134,14 @@ Not yet performed. No code has been written for this issue.
 
 Confirmed the root cause directly from the built sle15 datastream rather than assuming it from the issue text. Reproduced the exact failure using a fake root and a standalone OVAL document evaluated with `oscap oval eval`. An early grep for `oval-def:definition` style tags against a split datastream file returned nothing for `sshd_use_strong_ciphers`, which looked like the rule might not exist in the sle15 build. Checking the actual tag prefix used in the built file showed the grep itself was wrong, not the rule's presence, a useful reminder to verify a negative result before treating it as a finding. Read the actual macro source for `sshd_oval_check`, `oval_line_in_file_object`, and `oval_line_in_file_state` to confirm none of them support the comma split and intersection logic used by `sshd_use_approved_ciphers` and `sshd_use_approved_macs`. Later found a stronger precedent than any shared macro, both `sshd_use_approved_ciphers_ordered_stig` and `sshd_use_approved_macs_ordered_stig` already have a working fix in their own `oval/ubuntu.xml`, just not in `oval/shared.xml`. Confirmed no equivalent ubuntu.xml exists for the two plain variants. Verified ansible remediation, rule.yml platform scoping, and the `sshd_config_dir` variable are all already correct or generically available for both ordered_stig rules. Found `sshd_use_approved_ciphers_ordered_stig` has no config directory test while the macs rule does. Posted a scoping comment on the issue asking for direction on the two plain variants before touching shared macro code. No branch created yet, no fix written yet for the two ordered_stig rules covered by this plan.
 
+While adding the ciphers config dir test, I found that the existing MACs config dir test is scoped only to `multi_platform_ubuntu`, meaning neither rule currently has a config directory test that runs on the sle, ol, or rhel platforms where the actual bug was reported. I scoped the new ciphers test to those platforms instead, matching the scope of this rule's other existing tests, since that is where the fix actually needs to be verified. I left the existing MACs test unchanged, since editing a pre-existing test's scope is outside what this issue asked for. Worth flagging as a separate gap for later, not something to fold into this fix.
+
 ### Code Changes
 
-Not started.
+- **Files modified:** `sshd_use_approved_ciphers_ordered_stig/oval/shared.xml`, `sshd_use_approved_macs_ordered_stig/oval/shared.xml`
+- **Files added:** `sshd_use_approved_ciphers_ordered_stig/tests/correct_value_config_dir.pass.sh`
+- **Branch:** `fix-sshd-config-dir-mismatch-14926`
+- **Approach decisions:** Kept the original subset tolerant matching pattern in both rules exactly as it was, and only added a second object, test, and criterion for the config directory, rather than adopting the exact match style used in each rule's own `oval/ubuntu.xml`. The rule's own description states a subset in order is acceptable, and adopting the stricter ubuntu style would have quietly narrowed what passes on sle, ol, and slmicro, a behavior change outside the scope of this bug report.
 
 ---
 
